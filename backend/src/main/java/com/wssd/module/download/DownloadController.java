@@ -63,7 +63,7 @@ public class DownloadController {
             })
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(currentCount ->
-                extractorClient.getInfo(request.getUrl())
+                extractorClient.getInfo(request.url())
                     .map(info -> {
                         // Determine download count AFTER this request
                         int nextCount = currentCount + 1;
@@ -75,7 +75,7 @@ public class DownloadController {
                         response.put("sessionCount", nextCount);
 
                         // Record download asynchronously
-                        recordDownload(user, sessionId, request.getUrl(), info, slots, ip);
+                        recordDownload(user, sessionId, request.url(), info, slots, ip);
 
                         // Increment session counter
                         sessionService.incrementDownload(sessionId);

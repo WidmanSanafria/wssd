@@ -24,22 +24,22 @@ public class AuthService {
 
     @Transactional
     public TokenResponse register(RegisterRequest req) {
-        if (userRepository.existsByEmail(req.getEmail())) {
+        if (userRepository.existsByEmail(req.email())) {
             throw new ResponseStatusException(CONFLICT, "El email ya está registrado");
         }
         User user = User.builder()
-            .email(req.getEmail())
-            .passwordHash(passwordEncoder.encode(req.getPassword()))
-            .displayName(req.getDisplayName())
+            .email(req.email())
+            .passwordHash(passwordEncoder.encode(req.password()))
+            .displayName(req.displayName())
             .build();
         userRepository.save(user);
         return buildTokenResponse(user);
     }
 
     public TokenResponse login(LoginRequest req) {
-        User user = userRepository.findByEmail(req.getEmail())
+        User user = userRepository.findByEmail(req.email())
             .orElseThrow(() -> new BadCredentialsException("Credenciales inválidas"));
-        if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new BadCredentialsException("Credenciales inválidas");
         }
         return buildTokenResponse(user);

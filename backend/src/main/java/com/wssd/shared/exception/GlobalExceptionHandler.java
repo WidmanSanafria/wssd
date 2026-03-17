@@ -20,6 +20,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
+        if (ex.getStatusCode().value() == 400) {
+            log.warn("400 ResponseStatusException: reason={} cause={}", ex.getReason(), ex.getCause() != null ? ex.getCause().getMessage() : "null");
+        }
         return ResponseEntity.status(ex.getStatusCode()).body(errorBody(
             ex.getStatusCode().value(), ex.getReason() != null ? ex.getReason() : ex.getMessage()
         ));

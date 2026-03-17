@@ -43,7 +43,7 @@ public class Download {
     @Builder.Default
     private boolean hadAds = false;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
     @Column(name = "created_at", nullable = false, updatable = false)

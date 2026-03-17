@@ -1,14 +1,10 @@
 package com.wssd.module.auth.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 
-@Data
-public class LoginRequest {
-    @NotBlank @Email
-    private String email;
-
-    @NotBlank
-    private String password;
-}
+public record LoginRequest(
+    @JsonProperty("email")    @NotBlank @Email String email,
+    @JsonProperty("password") @NotBlank        String password
+) {}
