@@ -1,0 +1,38 @@
+## Environment
+.env
+*.local
+
+## Java / Maven
+target/
+*.class
+*.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+## Node / Angular
+node_modules/
+dist/
+.angular/
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+## Agent outputs
+agents/output/
+agents/node_modules/
+
+## Docker volumes
+pgdata/
+redisdata/
+
+## IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store

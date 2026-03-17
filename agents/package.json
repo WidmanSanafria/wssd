@@ -1,0 +1,22 @@
+{
+  "name": "wssd-agents",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "WSSD Marketing Automation Agents powered by Claude",
+  "scripts": {
+    "strategist": "tsx src/agent1-strategist.ts",
+    "coordinator": "tsx src/agent2-coordinator.ts",
+    "run-all": "tsx src/run-all.ts",
+    "run-facebook": "tsx src/run-all.ts facebook",
+    "run-instagram": "tsx src/run-all.ts instagram",
+    "run-tiktok": "tsx src/run-all.ts tiktok"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}
