@@ -26,7 +26,12 @@ services:
       REDIS_PORT:          6379
       EXTRACTOR_MS_URL:    http://extractor:8001
       JWT_SECRET:          ${JWT_SECRET:-dev-secret-change-in-prod-must-be-32-chars!}
-      STRIPE_SECRET_KEY:   ${STRIPE_SECRET_KEY:-}
+      STRIPE_SECRET_KEY:    ${STRIPE_SECRET_KEY:-}
+      GOOGLE_CLIENT_ID:     ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      FB_CLIENT_ID:         ${FB_CLIENT_ID:-}
+      FB_CLIENT_SECRET:     ${FB_CLIENT_SECRET:-}
+      APP_URL:              ${APP_URL:-http://localhost}
     depends_on:
       postgres:
         condition: service_healthy

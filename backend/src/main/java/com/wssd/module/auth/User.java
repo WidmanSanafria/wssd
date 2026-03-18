@@ -26,8 +26,14 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
+
+    @Column(name = "oauth_provider", length = 20)
+    private String oauthProvider;
+
+    @Column(name = "oauth_provider_id", length = 255)
+    private String oauthProviderId;
 
     @Column(name = "display_name")
     private String displayName;
@@ -62,7 +68,7 @@ public class User implements UserDetails {
 
     // ── UserDetails ──────────────────────────────────────
     @Override public String getUsername() { return email; }
-    @Override public String getPassword() { return passwordHash; }
+    @Override public String getPassword() { return passwordHash != null ? passwordHash : ""; }
     @Override public boolean isAccountNonExpired()     { return true; }
     @Override public boolean isAccountNonLocked()      { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }

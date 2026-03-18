@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, OnInit, signal, inject } from '@angular/core';
+import { RouterOutlet, ActivatedRoute, Router } from '@angular/router';
+import { AuthService } from './core/services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -7,6 +8,20 @@ import { RouterOutlet } from '@angular/router';
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-export class App {
+export class App implements OnInit {
   protected readonly title = signal('frontend');
+  private route  = inject(ActivatedRoute);
+  private router = inject(Router);
+  private auth   = inject(AuthService);
+
+  ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      const socialToken = params['socialToken'];
+      const refreshToken = params['refreshToken'];
+      if (socialToken && refreshToken) {
+        this.auth.storeSocialTokens(socialToken, refreshToken);
+        this.router.navigate(['/'], { replaceUrl: true });
+      }
+    });
+  }
 }

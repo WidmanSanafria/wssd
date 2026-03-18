@@ -36,6 +36,7 @@ public class SecurityConfig {
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .authorizeExchange(auth -> auth
                 // Public endpoints
+                .pathMatchers(HttpMethod.GET,  "/api/auth/oauth2/**").permitAll()
                 .pathMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                 .pathMatchers(HttpMethod.POST, "/api/download/info").permitAll()
                 .pathMatchers(HttpMethod.GET,  "/api/download/proxy").permitAll()

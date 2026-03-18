@@ -51,6 +51,16 @@ export class AuthService {
     );
   }
 
+  storeSocialTokens(accessToken: string, refreshToken: string): void {
+    localStorage.setItem(ACCESS_KEY, accessToken);
+    localStorage.setItem(REFRESH_KEY, refreshToken);
+    // Restore user profile from the new token
+    this.http.get<UserProfile>('/api/user/me').subscribe({
+      next:  u  => this.currentUser.set(u),
+      error: () => {}
+    });
+  }
+
   private saveSession(res: TokenResponse): void {
     localStorage.setItem(ACCESS_KEY, res.accessToken);
     localStorage.setItem(REFRESH_KEY, res.refreshToken);
