@@ -3,9 +3,11 @@ package com.wssd.module.download;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -25,8 +27,21 @@ public class ExtractorClient {
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("url", url))
             .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .doOnError(e -> log.error("Extractor /info error for {}: {}", url, e.getMessage()));
+            .onStatus(status -> status.is4xxClientError(),
+                resp -> resp.bodyToMono(String.class)
+                    .map(body -> {
+                        log.warn("Extractor /info 4xx for {}: {}", url, body);
+                        String msg = extractDetail(body);
+                        return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, msg);
+                    }))
+            .onStatus(status -> status.is5xxServerError(),
+                resp -> resp.bodyToMono(String.class)
+                    .map(body -> {
+                        log.error("Extractor /info 5xx for {}: {}", url, body);
+                        return new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                            "El extractor no pudo procesar la URL");
+                    }))
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
     }
 
     /** GET /proxy → streams the CDN response */
@@ -65,5 +80,19 @@ public class ExtractorClient {
                 .build())
             .retrieve()
             .bodyToFlux(byte[].class);
+    }
+
+    /** Try to pull a human-readable message from the extractor JSON body, else return as-is. */
+    private String extractDetail(String body) {
+        if (body == null || body.isBlank()) return "URL no compatible o error al extraer";
+        // extractor returns {"detail": "..."} on errors
+        if (body.contains("\"detail\"")) {
+            int start = body.indexOf("\"detail\"");
+            int colon = body.indexOf(':', start);
+            int quote1 = body.indexOf('"', colon + 1);
+            int quote2 = body.indexOf('"', quote1 + 1);
+            if (quote1 >= 0 && quote2 > quote1) return body.substring(quote1 + 1, quote2);
+        }
+        return body.length() > 200 ? "URL no compatible o error al extraer" : body;
     }
 }
