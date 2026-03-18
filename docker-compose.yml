@@ -60,7 +60,7 @@ services:
       context: ./extractor
       dockerfile: Dockerfile
     volumes:
-      - ./cookies:/cookies:ro
+      - cookies_data:/cookies:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -68,6 +68,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # Refresca cookies de Instagram/TikTok/Facebook automáticamente.
+  # Configura IG_EMAIL + IG_PASSWORD en .env para Instagram.
+  # Configura TT_SESSIONID en .env para TikTok.
+  # En producción: usa secrets del hosting (Railway, Fly.io, etc.)
+  cookie-refresher:
+    build:
+      context: ./cookie-refresher
+      dockerfile: Dockerfile
+    volumes:
+      - cookies_data:/cookies
+    environment:
+      IG_EMAIL:            ${IG_EMAIL:-}
+      IG_PASSWORD:         ${IG_PASSWORD:-}
+      TT_SESSIONID:        ${TT_SESSIONID:-}
+      FB_COOKIES:          ${FB_COOKIES:-}
+      REFRESH_INTERVAL_H:  ${REFRESH_INTERVAL_H:-12}
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
@@ -99,3 +117,4 @@ services:
 volumes:
   pgdata:
   redisdata:
+  cookies_data:   # compartido entre extractor y cookie-refresher

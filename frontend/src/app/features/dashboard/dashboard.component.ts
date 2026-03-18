@@ -1,9 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
-import { DownloadService } from '../../../core/services/download.service';
-import type { Download } from '../../../core/models/download.models';
+import { AuthService } from '../../core/services/auth.service';
+import { DownloadService } from '../../core/services/download.service';
+import type { Download } from '../../core/models/download.models';
 
 @Component({
   selector: 'wssd-dashboard',
