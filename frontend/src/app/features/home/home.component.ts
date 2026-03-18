@@ -5,6 +5,7 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { DownloadService } from '../../core/services/download.service';
 import { SessionService } from '../../core/services/session.service';
+import { AuthService } from '../../core/services/auth.service';
 import type { VideoFormat, CarouselItem } from '../../core/models/download.models';
 
 @Component({
@@ -28,7 +29,14 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
     </div>
     <div class="header-nav">
       <a routerLink="/pricing" class="nav-link">Precios</a>
-      <a routerLink="/login" class="nav-link">Iniciar sesión</a>
+      @if (auth.isLoggedIn()) {
+        <a routerLink="/dashboard" class="nav-link">
+          {{ auth.currentUser()?.displayName || auth.currentUser()?.email }}
+        </a>
+        <button class="nav-link nav-btn" (click)="logout()">Salir</button>
+      } @else {
+        <a routerLink="/login" class="nav-link">Iniciar sesión</a>
+      }
     </div>
   </div>
 </header>
@@ -229,6 +237,7 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
     .hbadge.tt { color: #000; }
     .header-nav { display: flex; gap: 12px; }
     .nav-link { font-size: .85rem; font-weight: 600; color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 20px; box-shadow: 3px 3px 7px var(--shadow-d), -2px -2px 5px var(--shadow-l); }
+    .nav-btn { background:none; border:none; cursor:pointer; font-size:.85rem; font-weight:600; color:var(--muted); padding:6px 14px; border-radius:20px; box-shadow:3px 3px 7px var(--shadow-d),-2px -2px 5px var(--shadow-l); }
 
     .main { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
     .hero { text-align: center; padding: 40px 0 32px; }
@@ -293,6 +302,7 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
 export class HomeComponent implements OnInit {
   dl   = inject(DownloadService);
   sess = inject(SessionService);
+  auth = inject(AuthService);
   private route = inject(ActivatedRoute);
   private meta  = inject(Meta);
   private title = inject(Title);
@@ -321,6 +331,8 @@ export class HomeComponent implements OnInit {
       if (p['url']) { this.url = p['url']; this.search(); }
     });
   }
+
+  logout(): void { this.auth.logout(); }
 
   search(): void {
     const u = this.url.trim();

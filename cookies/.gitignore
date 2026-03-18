@@ -1,3 +1,3 @@
-# cookies.txt contiene sesiones de usuario — NUNCA subir a git
 *.txt
 *.json
+!.gitignore
