@@ -35,6 +35,10 @@ UA_DESKTOP = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
+
+# Si existe este archivo, yt-dlp lo usará para autenticarse en Instagram/TikTok/Facebook.
+# Expórtalo con la extensión "Get cookies.txt LOCALLY" desde Chrome/Firefox logueado.
+COOKIES_FILE = "/cookies/cookies.txt"
 _TAHOE = (
     "https://www.facebook.com/video/tahoe/async/%s/"
     "?chain=true&isvideo=true&payloadtype=primary"
@@ -83,7 +87,20 @@ def _unescape(s: str) -> str:
 # ──────────────────────────────────────────────────────────
 # Cookie helpers
 # ──────────────────────────────────────────────────────────
+def _cookies_file_exists() -> bool:
+    return os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0
+
+
 def _chrome_cookies(domain_fragment: str) -> dict:
+    """Read cookies from cookies.txt file (preferred) or Chrome browser (fallback)."""
+    if _cookies_file_exists():
+        try:
+            import http.cookiejar
+            jar = http.cookiejar.MozillaCookieJar(COOKIES_FILE)
+            jar.load(ignore_discard=True, ignore_expires=True)
+            return {c.name: c.value for c in jar if domain_fragment in (c.domain or "")}
+        except Exception:
+            pass
     try:
         from yt_dlp.cookies import extract_cookies_from_browser
         jar = extract_cookies_from_browser("chrome")
@@ -111,7 +128,10 @@ def _ytdlp_extract(url: str, cookies: bool = True) -> dict:
         "http_headers": {"User-Agent": UA_DESKTOP},
     }
     if cookies:
-        opts["cookiesfrombrowser"] = ("chrome",)
+        if _cookies_file_exists():
+            opts["cookiefile"] = COOKIES_FILE
+        else:
+            opts["cookiesfrombrowser"] = ("chrome",)
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -660,8 +680,9 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
     BEST_SEL = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
     is_tiktok = re.search(r"(tiktok\.com|vm\.tiktok\.com)", page_url or "")
     fmt_sel = BEST_SEL if is_tiktok or not format_id or format_id == "best" else format_id
+    cookie_opt = {"cookiefile": COOKIES_FILE} if _cookies_file_exists() else {"cookiesfrombrowser": ("chrome",)}
     opts: dict = {"quiet": True, "no_warnings": True, "outtmpl": out_path, "format": fmt_sel,
-                   "merge_output_format": "mp4", "cookiesfrombrowser": ("chrome",),
+                   "merge_output_format": "mp4", **cookie_opt,
                    "http_headers": {"User-Agent": UA_DESKTOP}}
     loop = asyncio.get_event_loop()
     try:

@@ -54,6 +54,8 @@ services:
     build:
       context: ./extractor
       dockerfile: Dockerfile
+    volumes:
+      - ./cookies:/cookies:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
