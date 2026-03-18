@@ -1,4 +1,5 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import type { TokenResponse, UserProfile } from '../models/download.models';
@@ -8,13 +9,16 @@ const REFRESH_KEY = 'wssd_refresh';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http = inject(HttpClient);
+  private http       = inject(HttpClient);
+  private platformId = inject(PLATFORM_ID);
 
   readonly currentUser = signal<UserProfile | null>(null);
   readonly isLoggedIn  = computed(() => !!this.currentUser());
 
   constructor() {
-    this.tryRestoreSession();
+    if (isPlatformBrowser(this.platformId)) {
+      this.tryRestoreSession();
+    }
   }
 
   login(email: string, password: string): Observable<TokenResponse> {
@@ -30,18 +34,18 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
+    this.storage('remove', ACCESS_KEY);
+    this.storage('remove', REFRESH_KEY);
     this.currentUser.set(null);
     this.http.post('/api/auth/logout', {}).subscribe();
   }
 
   getAccessToken(): string | null {
-    return localStorage.getItem(ACCESS_KEY);
+    return this.storage('get', ACCESS_KEY);
   }
 
   getRefreshToken(): string | null {
-    return localStorage.getItem(REFRESH_KEY);
+    return this.storage('get', REFRESH_KEY);
   }
 
   refreshToken(): Observable<TokenResponse> {
@@ -52,9 +56,8 @@ export class AuthService {
   }
 
   storeSocialTokens(accessToken: string, refreshToken: string): void {
-    localStorage.setItem(ACCESS_KEY, accessToken);
-    localStorage.setItem(REFRESH_KEY, refreshToken);
-    // Restore user profile from the new token
+    this.storage('set', ACCESS_KEY, accessToken);
+    this.storage('set', REFRESH_KEY, refreshToken);
     this.http.get<UserProfile>('/api/user/me').subscribe({
       next:  u  => this.currentUser.set(u),
       error: () => {}
@@ -62,18 +65,26 @@ export class AuthService {
   }
 
   private saveSession(res: TokenResponse): void {
-    localStorage.setItem(ACCESS_KEY, res.accessToken);
-    localStorage.setItem(REFRESH_KEY, res.refreshToken);
+    this.storage('set', ACCESS_KEY, res.accessToken);
+    this.storage('set', REFRESH_KEY, res.refreshToken);
     this.currentUser.set(res.user);
   }
 
   private tryRestoreSession(): void {
     const token = this.getAccessToken();
     if (!token) return;
-    // Restore user by fetching profile
     this.http.get<UserProfile>('/api/user/me').subscribe({
       next:  u  => this.currentUser.set(u),
       error: () => this.logout()
     });
+  }
+
+  /** Safe localStorage wrapper — no-op on the server (SSR). */
+  private storage(op: 'get' | 'set' | 'remove', key: string, value?: string): string | null {
+    if (!isPlatformBrowser(this.platformId)) return null;
+    if (op === 'get')    return localStorage.getItem(key);
+    if (op === 'set')    { localStorage.setItem(key, value!); return null; }
+    if (op === 'remove') { localStorage.removeItem(key); return null; }
+    return null;
   }
 }
