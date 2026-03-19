@@ -39,6 +39,8 @@ jobs:
           ssh root@${{ secrets.DEPLOY_HOST }} "
             cd /opt/wssd
             docker compose up -d --build --no-deps spring angular cookie-refresher 2>&1 | tail -10
+            # Reiniciar nginx para que resuelva las nuevas IPs de los containers
+            docker compose restart nginx 2>/dev/null | tail -2
             echo '✅ Deploy completado'
             docker compose ps | grep -v '^time='
           "
