@@ -41,6 +41,14 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
   </div>
 </header>
 
+@if (!bannerDismissed() && (!auth.isLoggedIn() || auth.currentUser()?.plan === 'free')) {
+  <div class="promo-banner">
+    <span class="promo-text">🔥 <strong>40% OFF</strong> el primer mes de Pro — Código: <code>WSSD40</code></span>
+    <a routerLink="/pricing" class="promo-cta">Ver planes</a>
+    <button class="promo-close" (click)="bannerDismissed.set(true)" aria-label="Cerrar">✕</button>
+  </div>
+}
+
 <main class="main">
   <section class="hero">
     <h1 class="hero-title">Descarga videos de redes sociales</h1>
@@ -331,6 +339,13 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
       .logo-name { font-size: .85rem; }
       .logo-pill { padding: 4px 10px; }
     }
+
+    .promo-banner { display:flex; align-items:center; justify-content:center; gap:12px; padding:10px 16px; background:linear-gradient(135deg,#833ab4,#e1306c,#1877f2); color:#fff; font-size:.88rem; flex-wrap:wrap; position:relative; }
+    .promo-text { display:flex; align-items:center; gap:6px; }
+    .promo-text code { background:rgba(255,255,255,.2); padding:2px 8px; border-radius:6px; font-size:.85rem; letter-spacing:1px; }
+    .promo-cta { background:#fff; color:#833ab4; font-weight:700; padding:5px 14px; border-radius:20px; text-decoration:none; font-size:.82rem; white-space:nowrap; }
+    .promo-close { position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:rgba(255,255,255,.7); cursor:pointer; font-size:1rem; padding:4px; line-height:1; }
+    @media(max-width:640px) { .promo-banner { gap:8px; padding:8px 36px 8px 12px; } .promo-text code { display:none; } }
   `]
 })
 export class HomeComponent implements OnInit {
@@ -342,6 +357,7 @@ export class HomeComponent implements OnInit {
   private title = inject(Title);
 
   url = '';
+  bannerDismissed = signal(false);
   showAds = computed(() => this.dl.result()
     ? (this.dl.result()!.adsConfig?.length ?? 0) > 0
     : this.sess.showAds()
