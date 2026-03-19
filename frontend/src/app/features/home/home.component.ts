@@ -297,6 +297,40 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
     .progress-fill { height: 100%; background: linear-gradient(90deg, var(--fb), var(--ig-a)); border-radius: 4px; transition: width .5s ease; }
     .stage-text { font-size: .8rem; color: var(--muted); margin-top: 8px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive móvil ── */
+    @media (max-width: 640px) {
+      .header { padding: 0 14px; }
+      .header-inner { height: 54px; gap: 8px; }
+      .header-badges { display: none; }
+      .logo > span:last-child { display: none; }
+      .nav-link, .nav-btn { padding: 5px 10px; font-size: .78rem; }
+
+      .main { padding: 20px 14px 60px; }
+      .hero { padding: 24px 0 20px; }
+      .hero-title { font-size: 1.7rem; }
+      .hero-sub { letter-spacing: 2px; font-size: .7rem; }
+      .search-wrap { flex-direction: column; padding: 14px; gap: 10px; }
+      .search-input { padding: 13px 14px; font-size: .95rem; width: 100%; }
+      .search-btn { width: 100%; justify-content: center; padding: 13px; }
+
+      .result { padding: 16px; }
+      .result-body { flex-direction: column; }
+      .thumb { width: 100%; height: 180px; }
+      .format-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .fmt-right { width: 100%; justify-content: flex-end; }
+      .btn-dl { padding: 10px 20px; font-size: .9rem; }
+
+      .carousel-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+
+      .dl-modal { padding: 24px 20px; }
+      .session-bar { flex-direction: column; gap: 10px; text-align: center; }
+    }
+
+    @media (max-width: 380px) {
+      .logo-name { font-size: .85rem; }
+      .logo-pill { padding: 4px 10px; }
+    }
   `]
 })
 export class HomeComponent implements OnInit {
@@ -340,38 +374,28 @@ export class HomeComponent implements OnInit {
     this.dl.getInfo(u).subscribe();
   }
 
-  async serverDownload(fmt: VideoFormat, title: string): Promise<void> {
+  serverDownload(fmt: VideoFormat, title: string): void {
     const isTT = fmt.needs_ytdlp ?? false;
-    let dlUrl: string;
+    const dlUrl = isTT
+      ? this.dl.getYtdlpUrl(fmt.page_url ?? '', fmt.format_id, title)
+      : this.dl.getMergeUrl(fmt.url ?? '', fmt.audio_url ?? '', title);
 
-    if (isTT) {
-      dlUrl = this.dl.getYtdlpUrl(fmt.page_url ?? '', fmt.format_id, title);
-    } else {
-      dlUrl = this.dl.getMergeUrl(fmt.url ?? '', fmt.audio_url ?? '', title);
-    }
-
+    // Descarga directa: el navegador maneja el download nativamente.
+    // Funciona en iOS Safari, Android y todos los browsers de escritorio.
+    // El servidor envía Content-Disposition: attachment que dispara la descarga.
     this.showOverlay(isTT);
-    try {
-      const r = await fetch(dlUrl);
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
-        alert('❌ ' + (d.error ?? d.detail ?? 'Error al procesar el video.'));
-        return;
-      }
-      const blob = await r.blob();
-      const ext  = blob.type.includes('webm') ? '.webm' : '.mp4';
-      const a    = document.createElement('a');
-      a.href     = URL.createObjectURL(blob);
-      a.download = `${title}${ext}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
-    } catch (e: unknown) {
-      alert('Error: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      this.hideOverlay();
-    }
+
+    // Creamos un <a> invisible y lo activamos — dispara descarga nativa
+    const a = document.createElement('a');
+    a.href     = dlUrl;
+    a.download = title.replace(/[^\w\- ]/g, '_').slice(0, 80) + '.mp4';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Cerramos el overlay después de un tiempo prudencial
+    setTimeout(() => this.hideOverlay(), isTT ? 20000 : 12000);
   }
 
   downloadCarouselItem(item: CarouselItem, title: string): void {

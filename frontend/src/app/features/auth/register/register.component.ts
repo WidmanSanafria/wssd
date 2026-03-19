@@ -42,6 +42,7 @@ import { AuthService } from '../../../core/services/auth.service';
     .btn-primary { padding:14px; border:none; background:linear-gradient(135deg,#1877f2,#833ab4); color:#fff; border-radius:12px; font-weight:700; cursor:pointer; }
     .error { color:#c53030; font-size:.85rem; }
     a { color:#718096; font-size:.85rem; text-align:center; }
+    @media (max-width: 440px) { .auth-card { width:100%; border-radius:0; min-height:100vh; padding:32px 20px; } :host { align-items: flex-start; } }
     .btn-social { display:flex; align-items:center; justify-content:center; gap:10px; padding:12px 14px; border:none; border-radius:12px; font-size:.95rem; font-weight:600; cursor:pointer; box-shadow:4px 4px 10px var(--shadow-d),-4px -4px 10px var(--shadow-l); transition:box-shadow .15s; }
     .btn-social:hover { box-shadow:2px 2px 6px var(--shadow-d),-2px -2px 6px var(--shadow-l); }
     .btn-google { background:#fff; color:#3c4043; }
