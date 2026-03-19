@@ -43,9 +43,14 @@ jobs:
             docker compose ps | grep -v '^time='
           "
 
-      - name: Health check
+      - name: Health check (reintenta hasta 90s)
         run: |
-          sleep 30
-          STATUS=$(curl -sk https://45-55-251-17.sslip.io/actuator/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "UNKNOWN")
-          echo "Health: $STATUS"
-          [ "$STATUS" = "UP" ] && echo "✅ Deploy exitoso" || (echo "❌ Health check falló" && exit 1)
+          echo "Esperando que Spring Boot arranque..."
+          for i in $(seq 1 18); do
+            STATUS=$(curl -sk --max-time 5 https://45-55-251-17.sslip.io/actuator/health 2>/dev/null \
+              | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "WAIT")
+            echo "Intento $i/18: $STATUS"
+            [ "$STATUS" = "UP" ] && echo "✅ Deploy exitoso" && exit 0
+            sleep 5
+          done
+          echo "❌ Health check falló después de 90s" && exit 1
