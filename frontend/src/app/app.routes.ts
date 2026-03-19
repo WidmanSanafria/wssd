@@ -11,5 +11,6 @@ export const routes: Routes = [
   { path: 'facebook',  loadComponent: () => import('./features/landing/facebook/landing-facebook.component').then(m => m.LandingFacebookComponent) },
   { path: 'instagram', loadComponent: () => import('./features/landing/instagram/landing-instagram.component').then(m => m.LandingInstagramComponent) },
   { path: 'tiktok',    loadComponent: () => import('./features/landing/tiktok/landing-tiktok.component').then(m => m.LandingTikTokComponent) },
+  { path: 'login/oauth2/success', loadComponent: () => import('./features/auth/oauth-success/oauth-success.component').then(m => m.OAuthSuccessComponent) },
   { path: '**', redirectTo: '' },
 ];

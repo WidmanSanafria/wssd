@@ -58,6 +58,9 @@ wssd:
     per-minute: 20
     per-hour: 100
 
+app:
+  url: ${APP_URL:http://localhost}
+
 oauth:
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
@@ -67,3 +70,9 @@ oauth:
     client-id: ${FB_CLIENT_ID:}
     client-secret: ${FB_CLIENT_SECRET:}
     redirect-uri: ${APP_URL:http://localhost}/api/auth/oauth2/facebook/callback
+
+oauth2:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${APP_URL:http://localhost}/api/auth/oauth2/google/callback

@@ -61,6 +61,10 @@ public class AuthService {
         }
     }
 
+    public TokenResponse issueTokens(User user) {
+        return buildTokenResponse(user);
+    }
+
     private TokenResponse buildTokenResponse(User user) {
         return TokenResponse.builder()
             .accessToken(jwtService.generateToken(user))

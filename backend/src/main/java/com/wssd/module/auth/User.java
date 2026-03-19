@@ -35,6 +35,9 @@ public class User implements UserDetails {
     @Column(name = "oauth_provider_id", length = 255)
     private String oauthProviderId;
 
+    @Column(name = "google_id")
+    private String googleId;
+
     @Column(name = "display_name")
     private String displayName;
 
