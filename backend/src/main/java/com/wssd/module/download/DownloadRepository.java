@@ -12,4 +12,6 @@ public interface DownloadRepository extends JpaRepository<Download, UUID> {
     List<Download> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
     List<Download> findBySessionIdOrderByCreatedAtDesc(String sessionId, Pageable pageable);
     long countByUserId(UUID userId);
+    long countByPlatform(String platform);
+    List<Download> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

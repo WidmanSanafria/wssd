@@ -4,8 +4,14 @@ import com.stripe.Stripe;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
+import com.stripe.model.Price;
+import com.stripe.model.PriceCollection;
+import com.stripe.model.Product;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
+import com.stripe.param.PriceCreateParams;
+import com.stripe.param.PriceListParams;
+import com.stripe.param.ProductCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.wssd.module.auth.User;
 import com.wssd.module.auth.UserRepository;
@@ -43,11 +49,55 @@ public class BillingController {
     @Value("${stripe.enterprise-price-id}")
     private String enterprisePriceId;
 
+    @Value("${app.url:https://45-55-251-17.sslip.io}")
+    private String appUrl;
+
     private final UserRepository userRepository;
 
     @PostConstruct
     void init() {
         Stripe.apiKey = stripeSecretKey;
+        // Auto-create Stripe products/prices if using placeholder IDs
+        if (proPriceId.startsWith("price_pro") || proPriceId.isBlank()) {
+            try {
+                proPriceId = ensureStripePriceExists("WSSD Pro", "Pro plan — Descargas ilimitadas, HD, sin anuncios", 799L);
+                enterprisePriceId = ensureStripePriceExists("WSSD Enterprise", "Enterprise plan — API + multi-usuario + SLA 99.9%", 1999L);
+                log.info("Stripe prices initialized: pro={} enterprise={}", proPriceId, enterprisePriceId);
+            } catch (Exception e) {
+                log.warn("Could not auto-create Stripe prices: {}", e.getMessage());
+            }
+        }
+    }
+
+    private String ensureStripePriceExists(String productName, String description, long unitAmountCents) throws StripeException {
+        // Search for existing active price with this product name in metadata
+        PriceListParams listParams = PriceListParams.builder()
+            .setActive(true)
+            .setLimit(100L)
+            .build();
+        PriceCollection prices = Price.list(listParams);
+        for (Price p : prices.getData()) {
+            if (p.getMetadata() != null && productName.equals(p.getMetadata().get("wssd_product"))) {
+                return p.getId();
+            }
+        }
+        // Create product
+        ProductCreateParams prodParams = ProductCreateParams.builder()
+            .setName(productName)
+            .setDescription(description)
+            .build();
+        Product product = Product.create(prodParams);
+        // Create price
+        PriceCreateParams priceParams = PriceCreateParams.builder()
+            .setProduct(product.getId())
+            .setUnitAmount(unitAmountCents)
+            .setCurrency("usd")
+            .setRecurring(PriceCreateParams.Recurring.builder()
+                .setInterval(PriceCreateParams.Recurring.Interval.MONTH)
+                .build())
+            .putMetadata("wssd_product", productName)
+            .build();
+        return Price.create(priceParams).getId();
     }
 
     // POST /api/billing/checkout  (requires auth)
@@ -69,8 +119,8 @@ public class BillingController {
             SessionCreateParams params = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
                     .setCustomerEmail(user.getEmail())
-                    .setSuccessUrl("https://wssd.app/dashboard?checkout=success")
-                    .setCancelUrl("https://wssd.app/pricing?checkout=cancelled")
+                    .setSuccessUrl(appUrl + "/dashboard?checkout=success")
+                    .setCancelUrl(appUrl + "/pricing?checkout=cancelled")
                     .putMetadata("userId", user.getId().toString())
                     .addLineItem(
                         SessionCreateParams.LineItem.builder()
@@ -84,10 +134,17 @@ public class BillingController {
             return ResponseEntity.ok(new CheckoutResponse(session.getUrl()));
 
         }).onErrorResume(IllegalArgumentException.class, e ->
-                Mono.just(ResponseEntity.badRequest().<CheckoutResponse>build()))
+                Mono.just(ResponseEntity.badRequest()
+                    .<CheckoutResponse>body(new CheckoutResponse("ERROR: " + e.getMessage()))))
           .onErrorResume(StripeException.class, e -> {
-              log.error("Stripe error creating checkout: {}", e.getMessage());
-              return Mono.just(ResponseEntity.status(HttpStatus.BAD_GATEWAY).<CheckoutResponse>build());
+              log.error("Stripe error: {}", e.getMessage());
+              return Mono.just(ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                  .<CheckoutResponse>body(new CheckoutResponse("ERROR: " + e.getMessage())));
+          })
+          .onErrorResume(Exception.class, e -> {
+              log.error("Checkout error: {}", e.getMessage());
+              return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                  .<CheckoutResponse>body(new CheckoutResponse("ERROR: " + e.getMessage())));
           });
     }
 

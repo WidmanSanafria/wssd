@@ -12,5 +12,6 @@ export const routes: Routes = [
   { path: 'instagram', loadComponent: () => import('./features/landing/instagram/landing-instagram.component').then(m => m.LandingInstagramComponent) },
   { path: 'tiktok',    loadComponent: () => import('./features/landing/tiktok/landing-tiktok.component').then(m => m.LandingTikTokComponent) },
   { path: 'login/oauth2/success', loadComponent: () => import('./features/auth/oauth-success/oauth-success.component').then(m => m.OAuthSuccessComponent) },
+  { path: 'admin', loadComponent: () => import('./features/admin/admin.component').then(m => m.AdminComponent) },
   { path: '**', redirectTo: '' },
 ];

@@ -30,6 +30,9 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
     <div class="header-nav">
       <a routerLink="/pricing" class="nav-link">Precios</a>
       @if (auth.isLoggedIn()) {
+        @if (auth.currentUser()?.plan === 'admin') {
+          <a routerLink="/admin" class="nav-link admin-link">⚙ Admin</a>
+        }
         <a routerLink="/dashboard" class="nav-link">
           {{ auth.currentUser()?.displayName || auth.currentUser()?.email }}
         </a>
@@ -246,6 +249,7 @@ import type { VideoFormat, CarouselItem } from '../../core/models/download.model
     .header-nav { display: flex; gap: 12px; }
     .nav-link { font-size: .85rem; font-weight: 600; color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 20px; box-shadow: 3px 3px 7px var(--shadow-d), -2px -2px 5px var(--shadow-l); }
     .nav-btn { background:none; border:none; cursor:pointer; font-size:.85rem; font-weight:600; color:var(--muted); padding:6px 14px; border-radius:20px; box-shadow:3px 3px 7px var(--shadow-d),-2px -2px 5px var(--shadow-l); }
+    .admin-link { background: linear-gradient(135deg, var(--ig-a), var(--ig-b)); color: #fff !important; -webkit-text-fill-color: #fff !important; }
 
     .main { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
     .hero { text-align: center; padding: 40px 0 32px; }

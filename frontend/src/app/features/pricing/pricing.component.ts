@@ -380,7 +380,13 @@ export class PricingComponent implements OnInit {
     this.checkoutLoading.set(true);
     this.http.post<{ url: string }>('/api/billing/checkout', { plan }).subscribe({
       next:  res => { window.location.href = res.url; },
-      error: ()  => { this.checkoutLoading.set(false); }
+      error: (err) => {
+        this.checkoutLoading.set(false);
+        const msg = err?.error?.url?.startsWith('ERROR:')
+          ? err.error.url.replace('ERROR: ', '')
+          : 'Error al procesar el pago. Por favor intenta de nuevo.';
+        alert('❌ ' + msg);
+      }
     });
   }
 }

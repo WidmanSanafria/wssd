@@ -283,7 +283,13 @@ export class UpgradeComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.http.post<{ url: string }>('/api/billing/checkout', { plan: 'pro' }).subscribe({
       next:  res => { window.location.href = res.url; },
-      error: ()  => { this.loading.set(false); }
+      error: (err) => {
+        this.loading.set(false);
+        const msg = err?.error?.url?.startsWith('ERROR:')
+          ? err.error.url.replace('ERROR: ', '')
+          : 'Error al procesar el pago. Por favor intenta de nuevo.';
+        alert('❌ ' + msg);
+      }
     });
   }
 }
