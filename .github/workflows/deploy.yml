@@ -1,0 +1,51 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Agregar servidor a known_hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sincronizar código al servidor
+        run: |
+          rsync -az \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='frontend/.angular' \
+            --exclude='backend/target' \
+            --exclude='.env' \
+            --exclude='cookies/*.txt' \
+            ./ root@${{ secrets.DEPLOY_HOST }}:/opt/wssd/
+
+      - name: Rebuild y reiniciar contenedores
+        run: |
+          ssh root@${{ secrets.DEPLOY_HOST }} "
+            cd /opt/wssd
+            docker compose up -d --build --no-deps spring angular cookie-refresher 2>&1 | tail -10
+            echo '✅ Deploy completado'
+            docker compose ps | grep -v '^time='
+          "
+
+      - name: Health check
+        run: |
+          sleep 30
+          STATUS=$(curl -sk https://45-55-251-17.sslip.io/actuator/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "UNKNOWN")
+          echo "Health: $STATUS"
+          [ "$STATUS" = "UP" ] && echo "✅ Deploy exitoso" || (echo "❌ Health check falló" && exit 1)

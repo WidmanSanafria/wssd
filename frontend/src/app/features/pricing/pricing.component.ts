@@ -67,22 +67,22 @@ interface Plan {
 
         <div class="plan-price">
           @if (plan.originalPrice > 0 && annual()) {
-            <span class="price-original">${{ plan.originalPrice.toFixed(2) }}</span>
+            <span class="price-original">{{ '$' + plan.originalPrice.toFixed(2) }}</span>
           }
           @if (plan.originalPrice > 0 && !annual()) {
-            <span class="price-original">${{ (plan.originalPrice + 5).toFixed(2) }}</span>
+            <span class="price-original">{{ '$' + (plan.originalPrice + 5).toFixed(2) }}</span>
           }
           <span class="price-amount">
             @if (plan.monthlyPrice === 0) {
               Gratis
             } @else {
-              ${{ (annual() ? plan.annualPrice : plan.monthlyPrice).toFixed(2) }}<span class="price-period">/mes</span>
+              {{ '$' + (annual() ? plan.annualPrice : plan.monthlyPrice).toFixed(2) }}<span class="price-period">/mes</span>
             }
           </span>
         </div>
 
         @if (annual() && plan.monthlyPrice > 0) {
-          <p class="billed-note">Facturado anualmente ({{ (plan.annualPrice * 12).toFixed(2) }}/año)</p>
+          <p class="billed-note">Facturado anualmente ({{ '$' + (plan.annualPrice * 12).toFixed(2) }}/año)</p>
         }
 
         <ul class="features-list">
