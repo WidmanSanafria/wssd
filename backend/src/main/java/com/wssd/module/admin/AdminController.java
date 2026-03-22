@@ -97,7 +97,11 @@ public class AdminController {
             user.setPlan(newPlan);
             userRepository.save(user);
             log.info("Admin changed plan for user {} -> {}", user.getEmail(), newPlan);
-            return Map.of("id", id.toString(), "plan", newPlan, "ok", true);
+            Map<String, Object> result = new java.util.HashMap<>();
+            result.put("id", id.toString());
+            result.put("plan", newPlan);
+            result.put("ok", true);
+            return result;
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
