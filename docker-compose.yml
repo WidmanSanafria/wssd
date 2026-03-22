@@ -62,7 +62,7 @@ services:
       context: ./extractor
       dockerfile: Dockerfile
     volumes:
-      - cookies_data:/cookies:ro
+      - cookies_data:/cookies
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
