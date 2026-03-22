@@ -1,0 +1,187 @@
+<header class="header">
+  <div class="header-inner">
+    <a class="logo" routerLink="/">
+      <div class="logo-pill">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        <span class="logo-name">WSSD</span>
+      </div>
+      <span>WS Social Downloader</span>
+    </a>
+    <div class="header-badges">
+      <span class="hbadge fb">Facebook</span>
+      <span class="hbadge ig">Instagram</span>
+      <span class="hbadge tt">TikTok</span>
+    </div>
+    <div class="header-nav">
+      <a routerLink="/pricing" class="nav-link">Precios</a>
+      @if (auth.isLoggedIn()) {
+        @if (auth.currentUser()?.plan === 'admin') {
+          <a routerLink="/admin" class="nav-link admin-link">⚙ Admin</a>
+        }
+        <a routerLink="/dashboard" class="nav-link">
+          {{ auth.currentUser()?.displayName || auth.currentUser()?.email }}
+        </a>
+        <button class="nav-link nav-btn" (click)="logout()">Salir</button>
+      } @else {
+        <a routerLink="/login" class="nav-link">Iniciar sesión</a>
+      }
+    </div>
+  </div>
+</header>
+
+@if (!bannerDismissed() && (!auth.isLoggedIn() || auth.currentUser()?.plan === 'free')) {
+  <div class="promo-banner">
+    <span class="promo-text">🔥 <strong>40% OFF</strong> el primer mes de Pro — Código: <code>WSSD40</code></span>
+    <a routerLink="/pricing" class="promo-cta">Ver planes</a>
+    <button class="promo-close" (click)="bannerDismissed.set(true)" aria-label="Cerrar">✕</button>
+  </div>
+}
+
+<main class="main">
+  <section class="hero">
+    <h1 class="hero-title">Descarga videos de redes sociales</h1>
+    <p class="hero-sub">FACEBOOK · INSTAGRAM · TIKTOK</p>
+    <p class="hero-desc">Gratis, sin instalar nada. HD, audio, carousels.</p>
+
+    <div class="search-wrap neo">
+      <input
+        class="search-input neo-inset"
+        type="url"
+        [(ngModel)]="url"
+        placeholder="Pega el enlace aquí — Facebook, Instagram o TikTok"
+        (keydown.enter)="search()"
+        [disabled]="dl.loading()"
+      />
+      <button class="search-btn" (click)="search()" [disabled]="dl.loading() || !url.trim()">
+        @if (dl.loading()) {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"
+               style="animation:spin .8s linear infinite">
+            <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+          </svg>
+        } @else {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        }
+        {{ dl.loading() ? 'Analizando…' : 'Descargar' }}
+      </button>
+    </div>
+
+    @if (dl.error()) {
+      <div class="error-box neo-inset">⚠️ {{ dl.error() }}</div>
+    }
+  </section>
+
+  @if (showAds() && !dl.result()) {
+    <div class="ad-banner neo">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-XXXXXXXX"
+           data-ad-slot="banner_top"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
+  }
+
+  @if (dl.result(); as res) {
+    <section class="result neo">
+      <span class="platform-tag" [ngClass]="res.platform">{{ res.platform }}</span>
+
+      <div class="result-body">
+        @if (res.thumbnail) {
+          <img [src]="res.thumbnail" [alt]="res.title" class="thumb" loading="lazy" />
+        }
+        <div class="result-info">
+          <h2 class="result-title">{{ res.title }}</h2>
+          @if (res.uploader) { <p class="result-uploader">{{ res.uploader }}</p> }
+          @if (res.duration) { <p class="result-duration">⏱ {{ formatDuration(res.duration) }}</p> }
+        </div>
+      </div>
+
+      @if (showAds()) {
+        <div class="ad-mid neo-inset">
+          <span class="ad-label">Publicidad</span>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-XXXXXXXX"
+               data-ad-slot="banner_mid"
+               data-ad-format="auto"></ins>
+        </div>
+      }
+
+      @if (res.formats.length > 0) {
+        <div class="formats-list">
+          @for (fmt of res.formats; track fmt.format_id) {
+            <div class="format-row neo-sm">
+              <div class="fmt-left">
+                <span class="fmt-badge" [ngClass]="fmt.type === 'audio' ? 'audio' : isHD(fmt) ? 'hd' : 'sd'">
+                  {{ fmt.type === 'audio' ? 'MP3' : 'MP4' }}
+                </span>
+                <span class="fmt-label">{{ fmt.label }}</span>
+                <span class="fmt-size">{{ fmt.filesizeStr ?? 'Desconocido' }}</span>
+              </div>
+              <div class="fmt-right">
+                @if (fmt.needs_merge || fmt.needs_ytdlp) {
+                  <span class="merge-note">⚡ Procesado en servidor</span>
+                  <button class="btn-dl hd" (click)="serverDownload(fmt, res.title)">
+                    ↓ Descargar
+                  </button>
+                } @else {
+                  <a class="btn-dl sd" [href]="dl.getProxyUrl(fmt.url!, res.title)" download>
+                    ↓ Descargar
+                  </a>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (res.carousel.length > 0) {
+        <div class="carousel-section">
+          <h3 class="carousel-title">{{ res.carousel.length }} elementos</h3>
+          <div class="carousel-grid">
+            @for (item of res.carousel; track item.index) {
+              <div class="carousel-item neo-sm" (click)="downloadCarouselItem(item, res.title)">
+                @if (item.thumb) {
+                  <img [src]="item.thumb" [alt]="'Item ' + item.index" loading="lazy" />
+                }
+                <span class="item-type">{{ item.kind === 'video' ? '▶' : '🖼' }}</span>
+                <span class="item-num">#{{ item.index }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  }
+
+  @if (sess.status(); as s) {
+    @if (!s.loggedIn && s.count > 0) {
+      <div class="session-bar neo-inset">
+        <span>{{ s.remainingFree > 0 ? s.remainingFree + ' descargas gratuitas restantes' : 'Límite alcanzado — regístrate para continuar' }}</span>
+        @if (s.remainingFree === 0) {
+          <a routerLink="/upgrade" class="btn-upgrade">Ver planes</a>
+        }
+      </div>
+    }
+  }
+</main>
+
+@if (overlayVisible()) {
+  <div class="dl-overlay">
+    <div class="dl-modal neo">
+      <div class="dl-spinner"></div>
+      <h3>{{ overlayTitle() }}</h3>
+      <p>{{ overlayDesc() }}</p>
+      <div class="progress-track neo-inset">
+        <div class="progress-fill" [style.width]="overlayProgress() + '%'"></div>
+      </div>
+      <p class="stage-text">{{ overlayStage() }}</p>
+    </div>
+  </div>
+}
+
+<footer class="footer">
+  <p>© 2026 WSSD — WS Social Downloader | <a routerLink="/facebook">Facebook</a> · <a routerLink="/instagram">Instagram</a> · <a routerLink="/tiktok">TikTok</a></p>
+</footer>

@@ -127,11 +127,9 @@ def _ytdlp_extract(url: str, cookies: bool = True) -> dict:
         "skip_download": True,
         "http_headers": {"User-Agent": UA_DESKTOP},
     }
-    if cookies:
-        if _cookies_file_exists():
-            opts["cookiefile"] = COOKIES_FILE
-        else:
-            opts["cookiesfrombrowser"] = ("chrome",)
+    # Only use cookies if the file exists — never fall back to browser in Docker
+    if cookies and _cookies_file_exists():
+        opts["cookiefile"] = COOKIES_FILE
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -363,7 +361,8 @@ def _quality_label(fmt: dict) -> str:
 
 def _is_combined(f: dict) -> bool:
     vc = f.get("vcodec"); ac = f.get("acodec")
-    return vc not in ("none",) and vc != "" and ac not in ("none",) and ac != ""
+    # Both must be non-None, non-empty, and not the string "none"
+    return (bool(vc) and vc not in ("none",)) and (bool(ac) and ac not in ("none",))
 
 
 def _is_video_only(f: dict) -> bool:
@@ -515,6 +514,7 @@ async def get_info(request: VideoRequest):
             if car:
                 info["carousel"] = car
                 info["formats"]  = []
+                info.pop("entries", None)  # prevent build_formats from re-processing entries
         need_graphql = (info is None or (not info.get("formats") and not info.get("carousel")))
         if need_graphql and logged_in:
             try:
@@ -556,6 +556,14 @@ async def get_info(request: VideoRequest):
                     fmt["label"] = fmt["label"] + " (alta calidad)"
                 best_video_marked = True
 
+    elif platform == "instagram":
+        # Instagram CDN URLs expire in seconds → always re-download via yt-dlp
+        # to avoid corrupted downloads (expired URL returns HTML error page instead of video)
+        for fmt in formats:
+            if fmt.get("type") == "video" and not fmt.get("needs_merge"):
+                fmt["needs_ytdlp"] = True
+                fmt["page_url"]    = url
+
     return {"title": info.get("title", "Video"), "thumbnail": info.get("thumbnail"),
             "duration": info.get("duration"), "uploader": info.get("uploader"),
             "formats": formats, "carousel": carousel, "platform": platform}
@@ -569,12 +577,15 @@ async def proxy_download(url: str, filename: str = "video.mp4"):
     is_ig   = "cdninstagram" in url or "instagram" in url
     referer = "https://www.instagram.com/" if is_ig else "https://www.facebook.com/"
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=60,
+        async with httpx.AsyncClient(follow_redirects=True, timeout=120,
                                       headers={"User-Agent": UA_DESKTOP, "Referer": referer},
                                       cookies=httpx.Cookies(all_c)) as client:
             response = await client.get(url)
             response.raise_for_status()
             ct = response.headers.get("content-type", "video/mp4")
+            # Reject HTML responses — CDN URL likely expired or returned an error page
+            if "text/html" in ct or "application/xhtml" in ct:
+                raise HTTPException(410, "URL de descarga expirada. Por favor vuelve a buscar el video.")
             if "image" in ct: ext = "jpg"
             elif "audio" in ct: ext = "mp3"
             elif "webm" in ct: ext = "webm"
@@ -586,12 +597,16 @@ async def proxy_download(url: str, filename: str = "video.mp4"):
                 elif low_url.endswith(".mp3"): ext = "mp3"
                 else: ext = "mp4"
             safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + f".{ext}"
+            content = response.content  # read fully before context exits
             async def stream():
-                async for chunk in response.aiter_bytes(65536):
-                    yield chunk
+                chunk_size = 65536
+                for i in range(0, len(content), chunk_size):
+                    yield content[i:i + chunk_size]
             return StreamingResponse(stream(), media_type=ct,
                 headers={"Content-Disposition": f'attachment; filename="{safe}"',
-                         "Content-Length": response.headers.get("content-length", "")})
+                         "Content-Length": str(len(content))})
+    except HTTPException:
+        raise
     except httpx.HTTPError as e:
         raise HTTPException(502, f"Error al descargar: {e}")
 
@@ -677,13 +692,17 @@ async def merge_download(video_url: str, audio_url: str, filename: str = "video_
 async def ytdlp_download(page_url: str, format_id: str = "best", filename: str = "video"):
     tmp_dir  = tempfile.mkdtemp(prefix="wssd_tt_")
     out_path = os.path.join(tmp_dir, "output.mp4")
-    BEST_SEL = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+    BEST_SEL = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best"
     is_tiktok = re.search(r"(tiktok\.com|vm\.tiktok\.com)", page_url or "")
-    fmt_sel = BEST_SEL if is_tiktok or not format_id or format_id == "best" else format_id
-    cookie_opt = {"cookiefile": COOKIES_FILE} if _cookies_file_exists() else {"cookiesfrombrowser": ("chrome",)}
+    is_instagram = re.search(r"instagram\.com", page_url or "")
+    # For TikTok and Instagram always use best selection; for others use provided format_id
+    fmt_sel = BEST_SEL if (is_tiktok or is_instagram or not format_id or format_id == "best") else format_id
     opts: dict = {"quiet": True, "no_warnings": True, "outtmpl": out_path, "format": fmt_sel,
-                   "merge_output_format": "mp4", **cookie_opt,
+                   "merge_output_format": "mp4",
                    "http_headers": {"User-Agent": UA_DESKTOP}}
+    # Only use cookies if file exists — never fall back to browser in Docker
+    if _cookies_file_exists():
+        opts["cookiefile"] = COOKIES_FILE
     loop = asyncio.get_event_loop()
     try:
         def do_download():

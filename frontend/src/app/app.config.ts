@@ -3,7 +3,7 @@ import { provideRouter, withComponentInputBinding, withViewTransitions } from '@
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 import { routes } from './app.routes';
-import { jwtInterceptor } from './core/interceptors/jwt.interceptor';
+import { jwtInterceptor } from './interceptors/authentication.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
