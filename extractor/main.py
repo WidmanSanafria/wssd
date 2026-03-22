@@ -124,8 +124,9 @@ def _ytdlp_extract(url: str, cookies: bool = True, youtube: bool = False) -> dic
     if cookies and _cookies_file_exists():
         opts["cookiefile"] = COOKIES_FILE
     if youtube:
-        # web client uses Node.js JS runtime (installed in container) to solve bot challenges
+        # Use node.js JS runtime (installed in container) + web+ios clients
         opts["extractor_args"] = {"youtube": {"player_client": ["web", "ios"]}}
+        opts["js_runtimes"] = ["node:/usr/bin/node"]
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -830,6 +831,7 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
         opts["cookiefile"] = COOKIES_FILE
     if platform == "youtube":
         opts["extractor_args"] = {"youtube": {"player_client": ["web", "ios"]}}
+        opts["js_runtimes"] = ["node:/usr/bin/node"]
 
     loop = asyncio.get_event_loop()
     try:
