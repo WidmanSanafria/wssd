@@ -11,6 +11,7 @@
       <span class="hbadge fb">Facebook</span>
       <span class="hbadge ig">Instagram</span>
       <span class="hbadge tt">TikTok</span>
+      <span class="hbadge yt">YouTube</span>
     </div>
     <div class="header-nav">
       <a routerLink="/pricing" class="nav-link">Precios</a>
@@ -40,7 +41,7 @@
 <main class="main">
   <section class="hero">
     <h1 class="hero-title">Descarga videos de redes sociales</h1>
-    <p class="hero-sub">FACEBOOK · INSTAGRAM · TIKTOK</p>
+    <p class="hero-sub">FACEBOOK · INSTAGRAM · TIKTOK · YOUTUBE</p>
     <p class="hero-desc">Gratis, sin instalar nada. HD, audio, carousels.</p>
 
     <div class="search-wrap neo">
@@ -48,7 +49,7 @@
         class="search-input neo-inset"
         type="url"
         [(ngModel)]="url"
-        placeholder="Pega el enlace aquí — Facebook, Instagram o TikTok"
+        placeholder="Pega el enlace aquí — Facebook, Instagram, TikTok o YouTube"
         (keydown.enter)="search()"
         [disabled]="dl.loading()"
       />
@@ -183,5 +184,5 @@
 }
 
 <footer class="footer">
-  <p>© 2026 WSSD — WS Social Downloader | <a routerLink="/facebook">Facebook</a> · <a routerLink="/instagram">Instagram</a> · <a routerLink="/tiktok">TikTok</a></p>
+  <p>© 2026 WSSD — WS Social Downloader | <a routerLink="/facebook">Facebook</a> · <a routerLink="/instagram">Instagram</a> · <a routerLink="/tiktok">TikTok</a> · <a routerLink="/youtube">YouTube</a></p>
 </footer>

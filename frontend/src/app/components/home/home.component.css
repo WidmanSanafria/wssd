@@ -34,6 +34,7 @@
 .hbadge.fb { color: var(--fb); }
 .hbadge.ig { background: linear-gradient(90deg, var(--ig-a), var(--ig-b)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .hbadge.tt { color: #000; }
+.hbadge.yt { color: #ff0000; }
 .header-nav { display: flex; gap: 12px; }
 .nav-link { font-size: .85rem; font-weight: 600; color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 20px; box-shadow: 3px 3px 7px var(--shadow-d), -2px -2px 5px var(--shadow-l); }
 .nav-btn { background:none; border:none; cursor:pointer; font-size:.85rem; font-weight:600; color:var(--muted); padding:6px 14px; border-radius:20px; box-shadow:3px 3px 7px var(--shadow-d),-2px -2px 5px var(--shadow-l); }

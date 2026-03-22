@@ -1,0 +1,13 @@
+.page { max-width: 800px; margin: 0 auto; padding: 2rem; font-family: sans-serif; }
+header { margin-bottom: 2rem; }
+.hero { text-align: center; padding: 3rem 1rem; }
+h1 { font-size: 2rem; font-weight: 900; margin-bottom: 1rem; color: #1a202c; }
+p { color: #4a5568; margin-bottom: 2rem; }
+.search { display: flex; gap: .5rem; padding: .5rem; border-radius: 1rem; background: #e8e8e8; box-shadow: 8px 8px 16px #c5c5c5,-8px -8px 16px #ffffff; }
+.neo-inset { flex: 1; padding: .75rem 1rem; border: none; outline: none; border-radius: .75rem; background: #e8e8e8; box-shadow: inset 4px 4px 8px #c5c5c5,inset -4px -4px 8px #ffffff; font-size: 1rem; }
+.btn { padding: .75rem 1.5rem; background: #ff0000; color: #fff; border: none; border-radius: .75rem; font-weight: 700; cursor: pointer; font-size: 1rem; }
+.btn:hover { background: #cc0000; }
+.features { padding: 2rem 1rem; }
+h2 { text-align: center; font-size: 1.5rem; margin-bottom: 1.5rem; color: #1a202c; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+.card { padding: 1.25rem; text-align: center; border-radius: 1rem; background: #e8e8e8; box-shadow: 6px 6px 12px #c5c5c5,-6px -6px 12px #ffffff; font-weight: 600; }

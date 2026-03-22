@@ -1,7 +1,6 @@
 """
 WSSD Extractor Microservice — Puerto 8001
 Llamado por Spring Boot para extracción y descarga de videos.
-Conserva toda la lógica de extracción del monolito original.
 """
 import re
 import json
@@ -22,7 +21,7 @@ class VideoRequest(BaseModel):
     url: str
 
 
-app = FastAPI(title="WSSD Extractor MS", version="2.0.0")
+app = FastAPI(title="WSSD Extractor MS", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,9 +35,8 @@ UA_DESKTOP = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
-# Si existe este archivo, yt-dlp lo usará para autenticarse en Instagram/TikTok/Facebook.
-# Expórtalo con la extensión "Get cookies.txt LOCALLY" desde Chrome/Firefox logueado.
 COOKIES_FILE = "/cookies/cookies.txt"
+
 _TAHOE = (
     "https://www.facebook.com/video/tahoe/async/%s/"
     "?chain=true&isvideo=true&payloadtype=primary"
@@ -55,6 +53,8 @@ def _platform(url: str) -> str:
         return "instagram"
     if re.search(r"(tiktok\.com|vm\.tiktok\.com)", url):
         return "tiktok"
+    if re.search(r"(youtube\.com/watch|youtu\.be/|youtube\.com/shorts/|youtube\.com/live/)", url):
+        return "youtube"
     return "unknown"
 
 
@@ -92,7 +92,6 @@ def _cookies_file_exists() -> bool:
 
 
 def _chrome_cookies(domain_fragment: str) -> dict:
-    """Read cookies from cookies.txt file (preferred) or Chrome browser (fallback)."""
     if _cookies_file_exists():
         try:
             import http.cookiejar
@@ -101,12 +100,7 @@ def _chrome_cookies(domain_fragment: str) -> dict:
             return {c.name: c.value for c in jar if domain_fragment in (c.domain or "")}
         except Exception:
             pass
-    try:
-        from yt_dlp.cookies import extract_cookies_from_browser
-        jar = extract_cookies_from_browser("chrome")
-        return {c.name: c.value for c in jar if domain_fragment in c.domain}
-    except Exception:
-        return {}
+    return {}
 
 
 def _fb_logged_in(c: dict) -> bool:
@@ -127,7 +121,6 @@ def _ytdlp_extract(url: str, cookies: bool = True) -> dict:
         "skip_download": True,
         "http_headers": {"User-Agent": UA_DESKTOP},
     }
-    # Only use cookies if the file exists — never fall back to browser in Docker
     if cookies and _cookies_file_exists():
         opts["cookiefile"] = COOKIES_FILE
     with yt_dlp.YoutubeDL(opts) as ydl:
@@ -347,7 +340,7 @@ def _build_carousel_from_entries(info: dict) -> list:
 
 
 # ──────────────────────────────────────────────────────────
-# Format builder
+# Format builder — FIXED: proper video-only detection
 # ──────────────────────────────────────────────────────────
 def _quality_label(fmt: dict) -> str:
     h   = fmt.get("height") or 0
@@ -361,7 +354,6 @@ def _quality_label(fmt: dict) -> str:
 
 def _is_combined(f: dict) -> bool:
     vc = f.get("vcodec"); ac = f.get("acodec")
-    # Both must be non-None, non-empty, and not the string "none"
     return (bool(vc) and vc not in ("none",)) and (bool(ac) and ac not in ("none",))
 
 
@@ -399,59 +391,109 @@ def build_formats(info: dict) -> list:
     result: list = []
     seen: set = set()
 
+    # ── 1. Combined formats (have both video + audio) ──────────────
     combined = [f for f in raw if _is_combined(f) and f.get("ext") in ("mp4", "webm", "m4v")]
-    def sort_key(f):
-        h = f.get("height") or 0
-        fid = (f.get("format_id") or "").lower()
-        prio = 0 if "hd" in fid else (1 if "sd" in fid else 2)
-        return (-h, prio)
-    combined.sort(key=sort_key)
+    combined.sort(key=lambda f: (-(f.get("height") or 0),
+                                  0 if "hd" in (f.get("format_id") or "").lower() else 1))
     for fmt in combined:
         label = _quality_label(fmt)
-        if label in seen: continue
+        if label in seen:
+            continue
         seen.add(label)
-        result.append({"format_id": fmt.get("format_id", ""), "label": f"MP4 {label}",
-                        "quality": label, "ext": "mp4", "type": "video", "url": fmt.get("url"),
-                        "filesize": fmt.get("filesize") or fmt.get("filesize_approx"), "needs_merge": False})
+        result.append({
+            "format_id": fmt.get("format_id", ""),
+            "label": f"MP4 {label}",
+            "quality": label,
+            "ext": "mp4",
+            "type": "video",
+            "url": fmt.get("url"),
+            "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+            "needs_merge": False,
+        })
 
+    # ── 2. Video-only + audio-only → merge (ALL heights, not just >= 720) ──
     audio_only = sorted([f for f in raw if _is_audio_only(f)],
                          key=lambda x: x.get("abr") or x.get("tbr") or 0, reverse=True)
-    video_only = sorted([f for f in raw if _is_video_only(f) and f.get("ext") in ("mp4", "m4v", "webm")
-                         and (f.get("height") or 0) >= 720],
-                         key=lambda x: x.get("height") or 0, reverse=True)
+    video_only = sorted(
+        [f for f in raw if _is_video_only(f) and f.get("ext") in ("mp4", "m4v", "webm")],
+        key=lambda x: x.get("height") or 0, reverse=True
+    )
     for fmt in video_only[:2]:
         h = fmt.get("height") or 0
-        label = f"{h}p HD" if h else "HD DASH"
+        label = f"{h}p HD" if h >= 720 else (f"{h}p" if h else "HD DASH")
         full_label = f"MP4 {label} (alta calidad)"
-        if any(r["label"] == full_label for r in result): continue
-        result.append({"format_id": fmt.get("format_id", ""), "label": full_label,
-                        "quality": label, "ext": "mp4", "type": "video", "url": fmt.get("url"),
-                        "audio_url": audio_only[0].get("url") if audio_only else None,
-                        "filesize": fmt.get("filesize") or fmt.get("filesize_approx"), "needs_merge": True})
+        if any(r["label"] == full_label for r in result):
+            continue
+        result.append({
+            "format_id": fmt.get("format_id", ""),
+            "label": full_label,
+            "quality": label,
+            "ext": "mp4",
+            "type": "video",
+            "url": fmt.get("url"),
+            "audio_url": audio_only[0].get("url") if audio_only else None,
+            "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+            "needs_merge": True,
+        })
 
+    # ── 3. Audio-only format ──────────────────────────────────────
     if audio_only:
         a = audio_only[0]
-        result.append({"format_id": a.get("format_id", ""), "label": "MP3 Audio",
-                        "quality": "audio", "ext": "mp3", "type": "audio", "url": a.get("url"),
-                        "filesize": a.get("filesize") or a.get("filesize_approx"), "needs_merge": False})
+        result.append({
+            "format_id": a.get("format_id", ""),
+            "label": "MP3 Audio",
+            "quality": "audio",
+            "ext": "mp3",
+            "type": "audio",
+            "url": a.get("url"),
+            "filesize": a.get("filesize") or a.get("filesize_approx"),
+            "needs_merge": False,
+        })
 
+    # ── 4. Last resort — but detect video-only and mark needs_merge properly ──
     if not result:
-        candidates = sorted([f for f in raw if f.get("url")],
-                              key=lambda x: (x.get("height") or 0, x.get("tbr") or 0), reverse=True)
+        candidates = sorted(
+            [f for f in raw if f.get("url")],
+            key=lambda x: (x.get("height") or 0, x.get("tbr") or 0), reverse=True
+        )
         for fmt in candidates[:2]:
             h = fmt.get("height") or 0
             fid = (fmt.get("format_id") or "").lower()
             lbl = f"{h}p" if h else ("HD" if "hd" in fid else "SD")
-            result.append({"format_id": fmt.get("format_id", ""), "label": f"MP4 {lbl}",
-                            "quality": lbl, "ext": fmt.get("ext", "mp4"), "type": "video",
-                            "url": fmt.get("url"), "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
-                            "needs_merge": False})
+            is_vid_only = _is_video_only(fmt)
+            has_audio_fmt = len(audio_only) > 0
+            # If video-only, only add if we have audio to pair with it
+            if is_vid_only and has_audio_fmt:
+                result.append({
+                    "format_id": fmt.get("format_id", ""),
+                    "label": f"MP4 {lbl}",
+                    "quality": lbl,
+                    "ext": fmt.get("ext", "mp4"),
+                    "type": "video",
+                    "url": fmt.get("url"),
+                    "audio_url": audio_only[0].get("url"),
+                    "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+                    "needs_merge": True,
+                })
+            elif not is_vid_only:
+                result.append({
+                    "format_id": fmt.get("format_id", ""),
+                    "label": f"MP4 {lbl}",
+                    "quality": lbl,
+                    "ext": fmt.get("ext", "mp4"),
+                    "type": "video",
+                    "url": fmt.get("url"),
+                    "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+                    "needs_merge": False,
+                })
     return result
 
 
 def _fmt_size(size: Optional[int]) -> str:
-    if not size: return "Desconocido"
-    if size < 1_048_576: return f"{size / 1024:.1f} KB"
+    if not size:
+        return "Desconocido"
+    if size < 1_048_576:
+        return f"{size / 1024:.1f} KB"
     return f"{size / 1_048_576:.1f} MB"
 
 
@@ -471,7 +513,7 @@ async def get_info(request: VideoRequest):
 
     platform = _platform(url)
     if platform == "unknown":
-        raise HTTPException(400, "URL no soportada. Usa enlaces de Facebook, Instagram o TikTok.")
+        raise HTTPException(400, "URL no soportada. Usa enlaces de Facebook, Instagram, TikTok o YouTube.")
 
     loop = asyncio.get_event_loop()
     info = None
@@ -514,7 +556,7 @@ async def get_info(request: VideoRequest):
             if car:
                 info["carousel"] = car
                 info["formats"]  = []
-                info.pop("entries", None)  # prevent build_formats from re-processing entries
+                info.pop("entries", None)
         need_graphql = (info is None or (not info.get("formats") and not info.get("carousel")))
         if need_graphql and logged_in:
             try:
@@ -537,6 +579,14 @@ async def get_info(request: VideoRequest):
         if info is None:
             raise HTTPException(400, "No se pudo extraer el video de TikTok.")
 
+    elif platform == "youtube":
+        try:
+            info = await loop.run_in_executor(None, _ytdlp_extract, url, False)
+        except Exception as e:
+            errors.append(f"yt-dlp: {e}")
+        if info is None:
+            raise HTTPException(400, "No se pudo extraer el video de YouTube.")
+
     formats  = build_formats(info)
     carousel = info.get("carousel") or []
 
@@ -546,6 +596,7 @@ async def get_info(request: VideoRequest):
     for fmt in formats:
         fmt["filesizeStr"] = _fmt_size(fmt.get("filesize"))
 
+    # TikTok: always use yt-dlp download (most reliable, handles DRM/watermark)
     if platform == "tiktok":
         best_video_marked = False
         for fmt in formats:
@@ -556,63 +607,119 @@ async def get_info(request: VideoRequest):
                     fmt["label"] = fmt["label"] + " (alta calidad)"
                 best_video_marked = True
 
+    # Instagram: CDN URLs expire → always re-download via yt-dlp
     elif platform == "instagram":
-        # Instagram CDN URLs expire in seconds → always re-download via yt-dlp
-        # to avoid corrupted downloads (expired URL returns HTML error page instead of video)
         for fmt in formats:
             if fmt.get("type") == "video" and not fmt.get("needs_merge"):
                 fmt["needs_ytdlp"] = True
                 fmt["page_url"]    = url
 
-    return {"title": info.get("title", "Video"), "thumbnail": info.get("thumbnail"),
-            "duration": info.get("duration"), "uploader": info.get("uploader"),
-            "formats": formats, "carousel": carousel, "platform": platform}
+    # Facebook: CDN URLs can expire and DASH streams need merging → use yt-dlp for all videos
+    elif platform == "facebook":
+        for fmt in formats:
+            if fmt.get("type") == "video":
+                fmt["needs_ytdlp"] = True
+                fmt["page_url"]    = url
+                fmt["needs_merge"] = False  # yt-dlp handles the merge itself
+
+    # YouTube: always use yt-dlp (handles age-restricted, best quality selection)
+    elif platform == "youtube":
+        for fmt in formats:
+            if fmt.get("type") == "video":
+                fmt["needs_ytdlp"] = True
+                fmt["page_url"]    = url
+                fmt["needs_merge"] = False
+
+    return {
+        "title":     info.get("title", "Video"),
+        "thumbnail": info.get("thumbnail"),
+        "duration":  info.get("duration"),
+        "uploader":  info.get("uploader"),
+        "formats":   formats,
+        "carousel":  carousel,
+        "platform":  platform,
+    }
 
 
 @app.get("/proxy")
 async def proxy_download(url: str, filename: str = "video.mp4"):
+    """Proxy for direct CDN downloads (images, carousel items). Streams without loading into memory."""
     fb_c  = _chrome_cookies("facebook")
     ig_c  = _chrome_cookies("instagram")
     all_c = {**fb_c, **ig_c}
     is_ig   = "cdninstagram" in url or "instagram" in url
     referer = "https://www.instagram.com/" if is_ig else "https://www.facebook.com/"
+
+    client = httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=120,
+        headers={"User-Agent": UA_DESKTOP, "Referer": referer},
+        cookies=httpx.Cookies(all_c),
+    )
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=120,
-                                      headers={"User-Agent": UA_DESKTOP, "Referer": referer},
-                                      cookies=httpx.Cookies(all_c)) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            ct = response.headers.get("content-type", "video/mp4")
-            # Reject HTML responses — CDN URL likely expired or returned an error page
-            if "text/html" in ct or "application/xhtml" in ct:
-                raise HTTPException(410, "URL de descarga expirada. Por favor vuelve a buscar el video.")
-            if "image" in ct: ext = "jpg"
-            elif "audio" in ct: ext = "mp3"
-            elif "webm" in ct: ext = "webm"
+        # Use streaming to avoid loading large files into memory
+        req = client.build_request("GET", url)
+        response = await client.send(req, stream=True)
+        response.raise_for_status()
+
+        ct = response.headers.get("content-type", "video/mp4")
+
+        # Reject HTML error pages (expired CDN URLs)
+        if "text/html" in ct or "application/xhtml" in ct:
+            await response.aclose()
+            await client.aclose()
+            raise HTTPException(410, "URL de descarga expirada. Por favor vuelve a buscar el video.")
+
+        if "image" in ct:
+            ext = "jpg"
+        elif "audio" in ct:
+            ext = "mp3"
+        elif "webm" in ct:
+            ext = "webm"
+        else:
+            low_url = url.lower().split("?")[0]
+            if low_url.endswith((".jpg", ".jpeg")):
+                ext = "jpg"
+            elif low_url.endswith(".png"):
+                ext = "png"
+            elif low_url.endswith(".webm"):
+                ext = "webm"
+            elif low_url.endswith(".mp3"):
+                ext = "mp3"
             else:
-                low_url = url.lower().split("?")[0]
-                if low_url.endswith((".jpg", ".jpeg")): ext = "jpg"
-                elif low_url.endswith(".png"): ext = "png"
-                elif low_url.endswith(".webm"): ext = "webm"
-                elif low_url.endswith(".mp3"): ext = "mp3"
-                else: ext = "mp4"
-            safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + f".{ext}"
-            content = response.content  # read fully before context exits
-            async def stream():
-                chunk_size = 65536
-                for i in range(0, len(content), chunk_size):
-                    yield content[i:i + chunk_size]
-            return StreamingResponse(stream(), media_type=ct,
-                headers={"Content-Disposition": f'attachment; filename="{safe}"',
-                         "Content-Length": str(len(content))})
+                ext = "mp4"
+
+        safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + f".{ext}"
+        content_length = response.headers.get("content-length")
+
+        async def stream_content():
+            try:
+                async for chunk in response.aiter_bytes(65536):
+                    yield chunk
+            finally:
+                await response.aclose()
+                await client.aclose()
+
+        headers = {"Content-Disposition": f'attachment; filename="{safe}"'}
+        if content_length:
+            headers["Content-Length"] = content_length
+
+        return StreamingResponse(stream_content(), media_type=ct, headers=headers)
+
     except HTTPException:
+        await client.aclose()
         raise
     except httpx.HTTPError as e:
+        await client.aclose()
         raise HTTPException(502, f"Error al descargar: {e}")
+    except Exception as e:
+        await client.aclose()
+        raise HTTPException(500, f"Error inesperado: {e}")
 
 
 @app.get("/merge")
 async def merge_download(video_url: str, audio_url: str, filename: str = "video_hd.mp4"):
+    """Download video+audio streams separately then merge with ffmpeg."""
     fb_c  = _chrome_cookies("facebook")
     ig_c  = _chrome_cookies("instagram")
     all_c = {**fb_c, **ig_c}
@@ -672,60 +779,8 @@ async def merge_download(video_url: str, audio_url: str, filename: str = "video_
                     yield chunk
 
         def cleanup():
-            import shutil; shutil.rmtree(tmp_dir, ignore_errors=True)
-
-        async def astream():
-            loop = asyncio.get_event_loop()
-            for chunk in iter_file():
-                yield chunk
-            await loop.run_in_executor(None, cleanup)
-
-        return StreamingResponse(astream(), media_type="video/mp4",
-            headers={"Content-Disposition": f'attachment; filename="{safe}"',
-                     "Content-Length": str(file_size)})
-    except Exception as e:
-        import shutil; shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(500, f"Error al procesar el video HD: {e}")
-
-
-@app.get("/ytdlp-download")
-async def ytdlp_download(page_url: str, format_id: str = "best", filename: str = "video"):
-    tmp_dir  = tempfile.mkdtemp(prefix="wssd_tt_")
-    out_path = os.path.join(tmp_dir, "output.mp4")
-    BEST_SEL = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best"
-    is_tiktok = re.search(r"(tiktok\.com|vm\.tiktok\.com)", page_url or "")
-    is_instagram = re.search(r"instagram\.com", page_url or "")
-    # For TikTok and Instagram always use best selection; for others use provided format_id
-    fmt_sel = BEST_SEL if (is_tiktok or is_instagram or not format_id or format_id == "best") else format_id
-    opts: dict = {"quiet": True, "no_warnings": True, "outtmpl": out_path, "format": fmt_sel,
-                   "merge_output_format": "mp4",
-                   "http_headers": {"User-Agent": UA_DESKTOP}}
-    # Only use cookies if file exists — never fall back to browser in Docker
-    if _cookies_file_exists():
-        opts["cookiefile"] = COOKIES_FILE
-    loop = asyncio.get_event_loop()
-    try:
-        def do_download():
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([page_url])
-        await asyncio.wait_for(loop.run_in_executor(None, do_download), timeout=300)
-        actual = out_path
-        if not os.path.exists(actual):
-            candidates = sorted([os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir)],
-                                  key=os.path.getsize, reverse=True)
-            if not candidates:
-                raise RuntimeError("yt-dlp no descargó ningún archivo.")
-            actual = candidates[0]
-        file_size = os.path.getsize(actual)
-        safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + ".mp4"
-
-        def iter_file():
-            with open(actual, "rb") as f:
-                while chunk := f.read(65536):
-                    yield chunk
-
-        def cleanup():
-            import shutil; shutil.rmtree(tmp_dir, ignore_errors=True)
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
         async def astream():
             ev = asyncio.get_event_loop()
@@ -737,5 +792,84 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
             headers={"Content-Disposition": f'attachment; filename="{safe}"',
                      "Content-Length": str(file_size)})
     except Exception as e:
-        import shutil; shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(500, f"Error al descargar con yt-dlp: {e}")
+        import shutil
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise HTTPException(500, f"Error al procesar el video HD: {e}")
+
+
+@app.get("/ytdlp-download")
+async def ytdlp_download(page_url: str, format_id: str = "best", filename: str = "video"):
+    """Use yt-dlp to download+merge, then stream the result. Handles all platforms reliably."""
+    tmp_dir  = tempfile.mkdtemp(prefix="wssd_dl_")
+    out_path = os.path.join(tmp_dir, "output.mp4")
+
+    # Best format selection: prefer mp4+m4a, fallback to best available
+    BEST_SEL = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best[ext=mp4]/best"
+
+    platform = _platform(page_url or "")
+    # For platforms that need best quality auto-selection, ignore format_id
+    auto_select = platform in ("tiktok", "instagram", "youtube") or not format_id or format_id == "best"
+    fmt_sel = BEST_SEL if auto_select else format_id
+
+    opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "outtmpl": out_path,
+        "format": fmt_sel,
+        "merge_output_format": "mp4",
+        "http_headers": {"User-Agent": UA_DESKTOP},
+        "postprocessors": [{
+            "key": "FFmpegVideoConvertor",
+            "preferedformat": "mp4",
+        }],
+    }
+    if _cookies_file_exists():
+        opts["cookiefile"] = COOKIES_FILE
+
+    loop = asyncio.get_event_loop()
+    try:
+        def do_download():
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([page_url])
+
+        await asyncio.wait_for(loop.run_in_executor(None, do_download), timeout=600)
+
+        # Find the downloaded file (yt-dlp may add extension)
+        actual = out_path
+        if not os.path.exists(actual):
+            candidates = sorted(
+                [os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir)],
+                key=os.path.getsize, reverse=True
+            )
+            if not candidates:
+                raise RuntimeError("yt-dlp no descargó ningún archivo.")
+            actual = candidates[0]
+
+        file_size = os.path.getsize(actual)
+        if file_size == 0:
+            raise RuntimeError("El archivo descargado está vacío.")
+
+        safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + ".mp4"
+
+        def iter_file():
+            with open(actual, "rb") as f:
+                while chunk := f.read(65536):
+                    yield chunk
+
+        def cleanup():
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        async def astream():
+            ev = asyncio.get_event_loop()
+            for chunk in iter_file():
+                yield chunk
+            await ev.run_in_executor(None, cleanup)
+
+        return StreamingResponse(astream(), media_type="video/mp4",
+            headers={"Content-Disposition": f'attachment; filename="{safe}"',
+                     "Content-Length": str(file_size)})
+    except Exception as e:
+        import shutil
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise HTTPException(500, f"Error al descargar: {e}")
