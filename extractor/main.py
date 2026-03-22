@@ -536,7 +536,7 @@ async def get_info(request: VideoRequest):
                 info = await loop.run_in_executor(None, _ytdlp_extract, url, False)
             except Exception as e:
                 errors.append(f"yt-dlp: {e}")
-        if info is None and logged_in:
+        if info is None:
             try:
                 info = await _fb_tahoe(url, fb_cookies)
             except Exception as e:
