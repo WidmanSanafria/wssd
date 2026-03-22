@@ -581,7 +581,7 @@ async def get_info(request: VideoRequest):
 
     elif platform == "youtube":
         try:
-            info = await loop.run_in_executor(None, _ytdlp_extract, url, False)
+            info = await loop.run_in_executor(None, _ytdlp_extract, url, True)
         except Exception as e:
             errors.append(f"yt-dlp: {e}")
         if info is None:

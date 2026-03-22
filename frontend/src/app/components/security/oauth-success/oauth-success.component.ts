@@ -1,4 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../services/authentication/authentication.service';
 
@@ -9,11 +10,13 @@ import { AuthService } from '../../../services/authentication/authentication.ser
   styleUrl: './oauth-success.component.css'
 })
 export class OAuthSuccessComponent implements OnInit {
-  private route  = inject(ActivatedRoute);
-  private router = inject(Router);
-  private auth   = inject(AuthService);
+  private route      = inject(ActivatedRoute);
+  private router     = inject(Router);
+  private auth       = inject(AuthService);
+  private platformId = inject(PLATFORM_ID);
 
   ngOnInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
     this.route.queryParams.subscribe(params => {
       const access  = params['access'];
       const refresh = params['refresh'];

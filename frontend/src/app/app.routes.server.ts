@@ -28,6 +28,12 @@ export const serverRoutes: ServerRoute[] = [
     path: 'pricing',
     renderMode: RenderMode.Prerender
   },
+  // OAuth callback — MUST be client-only: tokens are saved to localStorage
+  // which doesn't exist on the server. SSR here means tokens are never saved.
+  {
+    path: 'login/oauth2/success',
+    renderMode: RenderMode.Client
+  },
   // Everything else: SSR
   {
     path: '**',
