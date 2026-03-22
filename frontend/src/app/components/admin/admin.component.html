@@ -1,0 +1,230 @@
+<div class="admin-page">
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="admin-header-inner">
+      <a routerLink="/" class="back-link">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        Inicio
+      </a>
+      <div class="admin-title-wrap">
+        <span class="admin-badge">ADMIN</span>
+        <h1 class="admin-title">Panel de Administración</h1>
+      </div>
+      <span class="admin-user-pill">{{ auth.currentUser()?.email }}</span>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <!-- Loading / Error states -->
+    @if (loading()) {
+      <div class="loading-wrap">
+        <div class="spinner"></div>
+        <p>Cargando datos…</p>
+      </div>
+    }
+
+    @if (error()) {
+      <div class="error-box neo-inset">
+        ⚠️ {{ error() }}
+      </div>
+    }
+
+    @if (!loading() && !error()) {
+
+      <!-- Stats cards -->
+      @if (stats()) {
+        <section class="stats-grid">
+          <div class="stat-card neo">
+            <div class="stat-icon users-icon">👥</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ stats()!.totalUsers }}</span>
+              <span class="stat-label">Total usuarios</span>
+            </div>
+          </div>
+          <div class="stat-card neo">
+            <div class="stat-icon pro-icon">⭐</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ stats()!.proUsers }}</span>
+              <span class="stat-label">Usuarios Pro</span>
+            </div>
+          </div>
+          <div class="stat-card neo">
+            <div class="stat-icon ent-icon">🏢</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ stats()!.enterpriseUsers }}</span>
+              <span class="stat-label">Enterprise</span>
+            </div>
+          </div>
+          <div class="stat-card neo">
+            <div class="stat-icon dl-icon">📥</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ stats()!.totalDownloads }}</span>
+              <span class="stat-label">Total descargas</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Platform stats -->
+        <section class="platform-stats neo">
+          <h3 class="section-subtitle">Descargas por plataforma</h3>
+          <div class="platform-row">
+            <div class="platform-item">
+              <span class="plat-badge fb">Facebook</span>
+              <span class="plat-count">{{ stats()!.byPlatform.facebook }}</span>
+            </div>
+            <div class="platform-item">
+              <span class="plat-badge ig">Instagram</span>
+              <span class="plat-count">{{ stats()!.byPlatform.instagram }}</span>
+            </div>
+            <div class="platform-item">
+              <span class="plat-badge tt">TikTok</span>
+              <span class="plat-count">{{ stats()!.byPlatform.tiktok }}</span>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- Tabs -->
+      <div class="tabs-wrap">
+        <button class="tab-btn" [class.active]="activeTab() === 'users'" (click)="setTab('users')">
+          Usuarios <span class="tab-count">{{ usersTotal() }}</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'downloads'" (click)="setTab('downloads')">
+          Descargas <span class="tab-count">{{ downloads().length }}</span>
+        </button>
+      </div>
+
+      <!-- Users tab -->
+      @if (activeTab() === 'users') {
+        <section class="tab-content">
+          <div class="search-bar">
+            <input
+              class="search-input neo-inset"
+              type="text"
+              placeholder="Buscar por email o nombre…"
+              [(ngModel)]="searchQuery"
+              (input)="onSearch()"
+            />
+            <button class="refresh-btn neo" (click)="loadUsers()">
+              ↺ Actualizar
+            </button>
+          </div>
+
+          <div class="table-wrap neo">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Nombre</th>
+                  <th>Plan</th>
+                  <th>Registro</th>
+                  <th>Descargas</th>
+                  <th>Auth</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (user of users(); track user.id) {
+                  <tr>
+                    <td class="email-cell">{{ user.email }}</td>
+                    <td>{{ user.displayName || '—' }}</td>
+                    <td>
+                      <span class="plan-badge" [ngClass]="'plan-' + user.plan">{{ user.plan }}</span>
+                    </td>
+                    <td class="date-cell">{{ formatDate(user.createdAt) }}</td>
+                    <td class="num-cell">{{ user.downloads }}</td>
+                    <td>
+                      @if (user.googleId) {
+                        <span class="auth-badge google">Google</span>
+                      } @else {
+                        <span class="auth-badge email">Email</span>
+                      }
+                    </td>
+                    <td>
+                      <div class="plan-change-wrap">
+                        <select class="plan-select neo-inset" [ngModel]="user.plan" (ngModelChange)="changePlan(user, $event)">
+                          <option value="free">free</option>
+                          <option value="pro">pro</option>
+                          <option value="enterprise">enterprise</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      </div>
+                    </td>
+                  </tr>
+                }
+                @if (users().length === 0) {
+                  <tr>
+                    <td colspan="7" class="empty-cell">No hay usuarios que mostrar</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination">
+            <button class="page-btn neo" (click)="prevPage()" [disabled]="usersPage() === 0">
+              ← Anterior
+            </button>
+            <span class="page-info">Página {{ usersPage() + 1 }} · {{ usersTotal() }} usuarios</span>
+            <button class="page-btn neo" (click)="nextPage()" [disabled]="(usersPage() + 1) * pageSize >= usersTotal()">
+              Siguiente →
+            </button>
+          </div>
+        </section>
+      }
+
+      <!-- Downloads tab -->
+      @if (activeTab() === 'downloads') {
+        <section class="tab-content">
+          <div class="search-bar">
+            <button class="refresh-btn neo" (click)="loadDownloads()">
+              ↺ Actualizar
+            </button>
+          </div>
+
+          <div class="table-wrap neo">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Plataforma</th>
+                  <th>Título</th>
+                  <th>Fecha</th>
+                  <th>Usuario ID</th>
+                  <th>Anuncios</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (dl of downloads(); track dl.id) {
+                  <tr>
+                    <td>
+                      <span class="plat-badge" [ngClass]="dl.platform">{{ dl.platform }}</span>
+                    </td>
+                    <td class="title-cell" [title]="dl.title || dl.sourceUrl">
+                      {{ truncate(dl.title || dl.sourceUrl, 50) }}
+                    </td>
+                    <td class="date-cell">{{ formatDate(dl.createdAt) }}</td>
+                    <td class="id-cell">{{ dl.userId ? dl.userId.slice(0, 8) + '…' : 'anon' }}</td>
+                    <td>
+                      @if (dl.hadAds) {
+                        <span class="ads-badge yes">Sí</span>
+                      } @else {
+                        <span class="ads-badge no">No</span>
+                      }
+                    </td>
+                  </tr>
+                }
+                @if (downloads().length === 0) {
+                  <tr>
+                    <td colspan="5" class="empty-cell">No hay descargas que mostrar</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+    }
+  </main>
+</div>

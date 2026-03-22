@@ -13,7 +13,10 @@ export const jwtInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, nex
 
   return next(authReq).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 401 && auth.getRefreshToken()) {
+      // Never try to refresh if this IS the refresh call itself (avoid infinite loop)
+      const isRefreshCall = req.url.includes('/api/auth/refresh');
+
+      if (err.status === 401 && !isRefreshCall && auth.getRefreshToken()) {
         return auth.refreshToken().pipe(
           switchMap(res => {
             const retried = req.clone({ setHeaders: { Authorization: `Bearer ${res.accessToken}` } });

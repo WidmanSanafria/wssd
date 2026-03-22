@@ -1,0 +1,12 @@
+:host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #e0e5ec;
+  font-family: sans-serif;
+}
+.loading-wrap {
+  font-size: 1.1rem;
+  color: #718096;
+}

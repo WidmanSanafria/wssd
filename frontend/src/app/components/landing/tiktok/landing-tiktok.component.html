@@ -1,0 +1,20 @@
+<div class="page">
+  <header><a routerLink="/" style="text-decoration:none;color:#2d3748;font-weight:900">← WSSD</a></header>
+  <section class="hero">
+    <h1>Descargar Videos de TikTok Gratis</h1>
+    <p>Pega el enlace y descarga en HD. Sin registro, sin instalar nada.</p>
+    <div class="search neo">
+      <input type="url" [(ngModel)]="url" placeholder="Pega el enlace de TikTok aquí" class="neo-inset" (keydown.enter)="go()" />
+      <button (click)="go()" class="btn">Descargar</button>
+    </div>
+  </section>
+  <section class="features">
+    <h2>¿Por qué WSSD para TikTok?</h2>
+    <div class="cards">
+      <div class="card neo">🚀 Rápido y gratis</div>
+      <div class="card neo">📱 Funciona en móvil</div>
+      <div class="card neo">🎬 Calidad HD</div>
+      <div class="card neo">🔒 Sin registro</div>
+    </div>
+  </section>
+</div>

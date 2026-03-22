@@ -1,0 +1,132 @@
+<div class="upgrade-page">
+
+  <!-- Social proof bar -->
+  <div class="social-proof-bar">
+    🎉 <strong>+12,400 usuarios</strong> ya descargando sin límites
+  </div>
+
+  <main class="upgrade-main">
+
+    <!-- Emotional hook -->
+    <section class="hook-section">
+      <div class="hook-emoji">😤</div>
+      <h1 class="hook-title">5 descargas NO son suficientes, ¿verdad?</h1>
+      <p class="hook-sub">Ya lo sabemos. Por eso creamos Pro — descargas ilimitadas, sin anuncios, HD puro.</p>
+    </section>
+
+    <!-- Urgency countdown -->
+    <div class="countdown-wrap neo">
+      <div class="countdown-label">⏰ Oferta expira en:</div>
+      <div class="countdown-timer">
+        <div class="time-block neo-inset">
+          <span class="time-num">{{ hours() }}</span>
+          <span class="time-unit">h</span>
+        </div>
+        <span class="time-sep">:</span>
+        <div class="time-block neo-inset">
+          <span class="time-num">{{ minutes() }}</span>
+          <span class="time-unit">m</span>
+        </div>
+        <span class="time-sep">:</span>
+        <div class="time-block neo-inset">
+          <span class="time-num">{{ seconds() }}</span>
+          <span class="time-unit">s</span>
+        </div>
+      </div>
+      <p class="countdown-sub">Precio especial de lanzamiento — solo {{ annual ? '$5.32' : '$7.99' }}/mes</p>
+    </div>
+
+    <!-- Comparison Free vs Pro -->
+    <section class="comparison-section">
+      <h2 class="section-label">¿Qué cambia con Pro?</h2>
+      <div class="compare-grid">
+        <div class="compare-card free-card neo-inset">
+          <div class="compare-header free-header">
+            <span class="compare-icon">😞</span>
+            <h3>Free (ahora)</h3>
+          </div>
+          <ul class="compare-list">
+            <li class="con">Solo 5 descargas/mes</li>
+            <li class="con">Anuncios en cada descarga</li>
+            <li class="con">Solo calidad SD</li>
+            <li class="con">Sin historial</li>
+            <li class="con">Soporte básico</li>
+          </ul>
+        </div>
+
+        <div class="compare-arrow">→</div>
+
+        <div class="compare-card pro-card neo">
+          <div class="compare-header pro-header">
+            <span class="compare-icon">🚀</span>
+            <h3>Pro</h3>
+          </div>
+          <ul class="compare-list">
+            <li class="pro">Descargas ILIMITADAS</li>
+            <li class="pro">Cero anuncios</li>
+            <li class="pro">HD + 4K calidad</li>
+            <li class="pro">Historial 90 días</li>
+            <li class="pro">Soporte prioritario</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main CTA -->
+    <section class="cta-section">
+      <div class="price-display neo">
+        <span class="old-price">$12.99</span>
+        <span class="new-price">$7.99</span>
+        <span class="per-month">/mes</span>
+        <span class="discount-tag">-38% OFF</span>
+      </div>
+
+      <button class="main-cta-btn" (click)="startCheckout()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="btn-spinner"></span> Redirigiendo…
+        } @else {
+          🚀 Obtener Pro — Solo $7.99/mes
+        }
+      </button>
+
+      <div class="guarantee-badge neo">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" class="shield-icon">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+        </svg>
+        <span>30 días de garantía sin riesgo · Reembolso completo si no estás satisfecho</span>
+      </div>
+    </section>
+
+    <!-- Trust badges -->
+    <section class="trust-section">
+      <div class="trust-badge neo">
+        <div class="trust-icon">🔒</div>
+        <div>
+          <strong>Pago seguro</strong>
+          <p>Procesado por Stripe con SSL</p>
+        </div>
+      </div>
+      <div class="trust-badge neo">
+        <div class="trust-icon">🚫</div>
+        <div>
+          <strong>Sin anuncios</strong>
+          <p>Experiencia 100% limpia</p>
+        </div>
+      </div>
+      <div class="trust-badge neo">
+        <div class="trust-icon">✋</div>
+        <div>
+          <strong>Cancela cuando quieras</strong>
+          <p>Sin permanencia ni sorpresas</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Secondary links -->
+    <p class="secondary-links">
+      <a routerLink="/pricing">Ver todos los planes</a> ·
+      <a routerLink="/">Volver al inicio</a>
+    </p>
+
+  </main>
+</div>

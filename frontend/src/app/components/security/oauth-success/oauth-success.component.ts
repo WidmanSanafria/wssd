@@ -5,7 +5,8 @@ import { AuthService } from '../../../services/authentication/authentication.ser
 @Component({
   selector: 'wssd-oauth-success',
   standalone: true,
-  template: `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#e0e5ec;font-family:sans-serif;font-size:1.1rem;color:#718096">Iniciando sesión…</div>`
+  templateUrl: './oauth-success.component.html',
+  styleUrl: './oauth-success.component.css'
 })
 export class OAuthSuccessComponent implements OnInit {
   private route  = inject(ActivatedRoute);
