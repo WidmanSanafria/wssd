@@ -127,7 +127,7 @@ def _ytdlp_extract(url: str, cookies: bool = True, youtube: bool = False) -> dic
         # Use node.js JS runtime + EJS challenge solver from GitHub
         opts["extractor_args"] = {"youtube": {"player_client": ["web"]}}
         opts["js_runtimes"] = {"node": {"path": "/usr/bin/node"}}
-        opts["remote_components"] = "ejs:github"
+        opts["remote_components"] = ["ejs:github"]
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -833,7 +833,7 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
     if platform == "youtube":
         opts["extractor_args"] = {"youtube": {"player_client": ["web"]}}
         opts["js_runtimes"] = {"node": {"path": "/usr/bin/node"}}
-        opts["remote_components"] = "ejs:github"
+        opts["remote_components"] = ["ejs:github"]
 
     loop = asyncio.get_event_loop()
     try:
