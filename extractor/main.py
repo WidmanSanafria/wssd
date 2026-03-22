@@ -114,7 +114,7 @@ def _ig_logged_in(c: dict) -> bool:
 # ──────────────────────────────────────────────────────────
 # yt-dlp extractor
 # ──────────────────────────────────────────────────────────
-def _ytdlp_extract(url: str, cookies: bool = True) -> dict:
+def _ytdlp_extract(url: str, cookies: bool = True, youtube: bool = False) -> dict:
     opts: dict = {
         "quiet": True,
         "no_warnings": True,
@@ -123,6 +123,9 @@ def _ytdlp_extract(url: str, cookies: bool = True) -> dict:
     }
     if cookies and _cookies_file_exists():
         opts["cookiefile"] = COOKIES_FILE
+    if youtube:
+        # Use iOS + TV embedded clients — bypass bot-check without needing a JS runtime
+        opts["extractor_args"] = {"youtube": {"player_client": ["ios", "tv_embedded"]}}
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -581,7 +584,7 @@ async def get_info(request: VideoRequest):
 
     elif platform == "youtube":
         try:
-            info = await loop.run_in_executor(None, _ytdlp_extract, url, True)
+            info = await loop.run_in_executor(None, lambda: _ytdlp_extract(url, True, youtube=True))
         except Exception as e:
             errors.append(f"yt-dlp: {e}")
         if info is None:
@@ -825,6 +828,8 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
     }
     if _cookies_file_exists():
         opts["cookiefile"] = COOKIES_FILE
+    if platform == "youtube":
+        opts["extractor_args"] = {"youtube": {"player_client": ["ios", "tv_embedded"]}}
 
     loop = asyncio.get_event_loop()
     try:
