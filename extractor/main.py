@@ -542,7 +542,10 @@ async def get_info(request: VideoRequest):
             except Exception as e:
                 errors.append(f"tahoe: {e}")
         if info is None:
-            raise HTTPException(400, "No se pudo extraer el video de Facebook.")
+            is_post = "/share/p/" in url or "/posts/" in url
+            if is_post:
+                raise HTTPException(400, "Este post de Facebook es privado o requiere iniciar sesión para verlo.")
+            raise HTTPException(400, "No se pudo extraer el video de Facebook. Verifica que el video sea público.")
 
     elif platform == "instagram":
         ig_cookies = _chrome_cookies("instagram")
