@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
 import yt_dlp
+import instaloader
 
 
 class VideoRequest(BaseModel):
@@ -92,6 +93,105 @@ def _extract_fb_id(url: str) -> Optional[str]:
 def _extract_ig_shortcode(url: str) -> Optional[str]:
     m = re.search(r"instagram\.com/(?:p|tv|reel)/([A-Za-z0-9_-]+)", url)
     return m.group(1) if m else None
+
+
+def _instaloader_extract(url: str) -> Optional[dict]:
+    """
+    Extrae metadatos de Instagram usando instaloader (no requiere cookies).
+    Soporta posts (/p/), reels (/reel/) e IGTV (/tv/).
+    Retorna un dict compatible con el formato de info de yt-dlp.
+    """
+    shortcode = _extract_ig_shortcode(url)
+    if not shortcode:
+        return None
+    try:
+        L = instaloader.Instaloader(
+            download_videos=False,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False,
+            quiet=True,
+        )
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+
+        # Carousel / sidecar post
+        if post.typename == "GraphSidecar":
+            carousel_items = []
+            idx = 1
+            for node in post.get_sidecar_nodes():
+                item = {"index": idx, "kind": "video" if node.is_video else "image"}
+                if node.is_video:
+                    item["url"]   = node.video_url
+                    item["thumb"] = node.display_url
+                else:
+                    item["url"]   = node.display_url
+                    item["thumb"] = node.display_url
+                carousel_items.append(item)
+                idx += 1
+            return {
+                "title":     post.caption[:80] if post.caption else f"Instagram post {shortcode}",
+                "thumbnail": post.url,
+                "uploader":  post.owner_username,
+                "duration":  None,
+                "formats":   [],
+                "carousel":  carousel_items,
+            }
+
+        # Single video
+        if post.is_video:
+            size_approx = None
+            return {
+                "title":     post.caption[:80] if post.caption else f"Instagram video {shortcode}",
+                "thumbnail": post.url,
+                "uploader":  post.owner_username,
+                "duration":  post.video_duration,
+                "formats": [{
+                    "format_id":   shortcode,
+                    "label":       "MP4 HD",
+                    "quality":     "hd",
+                    "ext":         "mp4",
+                    "type":        "video",
+                    "url":         post.video_url,
+                    "filesize":    size_approx,
+                    "needs_merge": False,
+                    "needs_ytdlp": False,
+                }],
+                "carousel": [],
+            }
+
+        # Single image (not a video) — return as carousel with 1 item
+        return {
+            "title":     post.caption[:80] if post.caption else f"Instagram image {shortcode}",
+            "thumbnail": post.url,
+            "uploader":  post.owner_username,
+            "duration":  None,
+            "formats":   [],
+            "carousel": [{
+                "index": 1, "kind": "image",
+                "url":   post.url, "thumb": post.url,
+            }],
+        }
+    except instaloader.exceptions.LoginRequiredException:
+        return None   # private post — will fall back to yt-dlp with cookies
+    except Exception:
+        return None
+
+
+def _sanitize_filename(name: str) -> str:
+    """
+    Elimina caracteres especiales del nombre de archivo.
+    Solo permite letras, números, espacios, guiones y guiones bajos.
+    Máximo 120 caracteres.
+    """
+    # Reemplaza separadores comunes con espacio
+    name = re.sub(r"[|/\\:*?\"<>]", " ", name)
+    # Elimina cualquier otro caracter no alfanumérico excepto espacio, guión, punto
+    name = re.sub(r"[^\w\s\-.]", "", name)
+    # Colapsa espacios múltiples
+    name = re.sub(r"\s+", " ", name).strip()
+    # Limita longitud
+    return name[:120] if name else "video"
 
 
 def _unescape(s: str) -> str:
@@ -633,31 +733,36 @@ async def get_info(request: VideoRequest):
             raise HTTPException(400, "No se pudo extraer el video de Facebook. Verifica que el video sea público.")
 
     elif platform == "instagram":
-        ig_cookies = _chrome_cookies("instagram")
-        logged_in  = _ig_logged_in(ig_cookies)
+        # 1️⃣ instaloader — más fiable, no requiere cookies para contenido público
         try:
-            info = await loop.run_in_executor(None, _ytdlp_extract, url, True)
+            info = await loop.run_in_executor(None, _instaloader_extract, url)
         except Exception as e:
-            errors.append(f"yt-dlp+cookies: {e}")
+            errors.append(f"instaloader: {e}")
+
+        # 2️⃣ yt-dlp con cookies (contenido privado o si instaloader falla)
+        if info is None:
+            ig_cookies = _chrome_cookies("instagram")
+            try:
+                info = await loop.run_in_executor(None, _ytdlp_extract, url, True)
+            except Exception as e:
+                errors.append(f"yt-dlp+cookies: {e}")
+
+        # 3️⃣ yt-dlp sin cookies (último recurso)
         if info is None:
             try:
                 info = await loop.run_in_executor(None, _ytdlp_extract, url, False)
             except Exception as e:
                 errors.append(f"yt-dlp: {e}")
+
         if info is not None and info.get("entries") is not None:
             car = _build_carousel_from_entries(info)
             if car:
                 info["carousel"] = car
                 info["formats"]  = []
                 info.pop("entries", None)
-        need_graphql = (info is None or (not info.get("formats") and not info.get("carousel")))
-        if need_graphql and logged_in:
-            try:
-                info = await _ig_graphql(url, ig_cookies)
-            except Exception as e:
-                errors.append(f"ig-graphql: {e}")
+
         if info is None:
-            raise HTTPException(400, "No se pudo extraer el contenido de Instagram.")
+            raise HTTPException(400, "No se pudo extraer el contenido de Instagram. El post puede ser privado.")
 
     elif platform == "tiktok":
         try:
@@ -724,7 +829,7 @@ async def get_info(request: VideoRequest):
                 fmt["needs_merge"] = False
 
     return {
-        "title":     info.get("title", "Video"),
+        "title":     _sanitize_filename(info.get("title") or "Video"),
         "thumbnail": info.get("thumbnail"),
         "duration":  info.get("duration"),
         "uploader":  info.get("uploader"),
@@ -782,7 +887,7 @@ async def proxy_download(url: str, filename: str = "video.mp4"):
             else:
                 ext = "mp4"
 
-        safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + f".{ext}"
+        safe = _sanitize_filename(filename) + f".{ext}"
         content_length = response.headers.get("content-length")
 
         async def stream_content():
@@ -863,8 +968,7 @@ async def merge_download(video_url: str, audio_url: str, filename: str = "video_
         if proc.returncode != 0:
             raise RuntimeError(f"ffmpeg error: {stderr_bytes.decode()[-800:]}")
 
-        safe = re.sub(r"[^a-zA-Z0-9]", "_", filename)
-        safe = re.sub(r"_+", "_", safe).strip("_")[:80] + ".mp4"
+        safe = _sanitize_filename(filename) + ".mp4"
         file_size = os.path.getsize(out_path)
 
         def iter_file():
@@ -959,8 +1063,7 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
         if file_size == 0:
             raise RuntimeError("El archivo descargado está vacío.")
 
-        safe = re.sub(r"[^a-zA-Z0-9]", "_", filename)
-        safe = re.sub(r"_+", "_", safe).strip("_")[:80] + ".mp4"
+        safe = _sanitize_filename(filename) + ".mp4"
 
         def iter_file():
             with open(actual, "rb") as f:
