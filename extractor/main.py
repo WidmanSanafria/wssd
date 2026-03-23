@@ -95,11 +95,25 @@ def _extract_ig_shortcode(url: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _load_ig_session_from_cookies() -> Optional[dict]:
+    """Lee sessionid y ds_user_id de cookies.txt para instaloader."""
+    result = {}
+    try:
+        with open(COOKIES_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split("\t")
+                if len(parts) >= 7 and "instagram" in parts[0]:
+                    result[parts[5]] = parts[6]
+    except Exception:
+        pass
+    return result if "sessionid" in result else None
+
+
 def _instaloader_extract(url: str) -> Optional[dict]:
     """
-    Extrae metadatos de Instagram usando instaloader (no requiere cookies).
+    Extrae metadatos de Instagram usando instaloader.
+    Usa sessionid de cookies.txt si está disponible.
     Soporta posts (/p/), reels (/reel/) e IGTV (/tv/).
-    Retorna un dict compatible con el formato de info de yt-dlp.
     """
     shortcode = _extract_ig_shortcode(url)
     if not shortcode:
@@ -113,6 +127,12 @@ def _instaloader_extract(url: str) -> Optional[dict]:
             save_metadata=False,
             quiet=True,
         )
+        # Inject session cookies if available
+        ig_session = _load_ig_session_from_cookies()
+        if ig_session:
+            for name, value in ig_session.items():
+                L.context._session.cookies.set(name, value, domain=".instagram.com")
+            L.context.username = ig_session.get("ds_user_id", "user")
         post = instaloader.Post.from_shortcode(L.context, shortcode)
 
         # Carousel / sidecar post
