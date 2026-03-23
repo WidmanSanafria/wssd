@@ -63,6 +63,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - cookies_data:/cookies
+    environment:
+      SYNC_API_KEY: ${SYNC_API_KEY:-wssd-sync-changeme}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
