@@ -825,9 +825,12 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
     )
 
     platform = _platform(page_url or "")
-    # Always use H.264-preferring selector — never use a raw format_id
-    # because Facebook DASH format_ids are often AV1/VP9 (incompatible with QuickTime)
-    fmt_sel = BEST_SEL
+    if platform == "facebook":
+        # Facebook progressive MP4s (hd/sd) are H.264 with audio already merged
+        # DASH formats are AV1 which is incompatible with QuickTime on Mac
+        fmt_sel = "hd/sd/bestvideo[vcodec^=avc1]+bestaudio/best[ext=mp4]/best"
+    else:
+        fmt_sel = BEST_SEL
 
     opts: dict = {
         "quiet": True,
