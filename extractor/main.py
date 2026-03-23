@@ -812,19 +812,22 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
     tmp_dir  = tempfile.mkdtemp(prefix="wssd_dl_")
     out_path = os.path.join(tmp_dir, "output.mp4")
 
-    # Best format selection: prefer mp4+m4a, fallback to best available
-    BEST_SEL = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best[ext=mp4]/best"
+    # Prefer H.264 (avc1) for maximum compatibility — QuickTime, iPhone, VLC, Windows
+    # AV1/VP9 are not supported by QuickTime Player on Mac
+    BEST_SEL = (
+        "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]"
+        "/bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]"
+        "/bestvideo[vcodec^=avc1]+bestaudio"
+        "/bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+        "/bestvideo[ext=mp4]+bestaudio"
+        "/bestvideo+bestaudio"
+        "/best[ext=mp4]/best"
+    )
 
     platform = _platform(page_url or "")
-    # For platforms that need best quality auto-selection, ignore format_id
-    auto_select = platform in ("tiktok", "instagram", "youtube") or not format_id or format_id == "best"
-    if auto_select:
-        fmt_sel = BEST_SEL
-    elif format_id.endswith("v"):
-        # Video-only format_id (e.g. Facebook DASH): append best audio so yt-dlp merges them
-        fmt_sel = f"{format_id}+bestaudio[ext=m4a]/bestvideo[id={format_id}]+bestaudio/bestvideo+bestaudio/best"
-    else:
-        fmt_sel = format_id
+    # Always use H.264-preferring selector — never use a raw format_id
+    # because Facebook DASH format_ids are often AV1/VP9 (incompatible with QuickTime)
+    fmt_sel = BEST_SEL
 
     opts: dict = {
         "quiet": True,
