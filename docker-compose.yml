@@ -84,6 +84,7 @@ services:
     volumes:
       - cookies_data:/cookies
     environment:
+      IG_SESSION_ID:       ${IG_SESSION_ID:-}
       IG_EMAIL:            ${IG_EMAIL:-}
       IG_PASSWORD:         ${IG_PASSWORD:-}
       TT_SESSIONID:        ${TT_SESSIONID:-}
