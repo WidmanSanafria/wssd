@@ -778,7 +778,8 @@ async def merge_download(video_url: str, audio_url: str, filename: str = "video_
         if proc.returncode != 0:
             raise RuntimeError(f"ffmpeg error: {stderr_bytes.decode()[-800:]}")
 
-        safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + ".mp4"
+        safe = re.sub(r"[^a-zA-Z0-9]", "_", filename)
+        safe = re.sub(r"_+", "_", safe).strip("_")[:80] + ".mp4"
         file_size = os.path.getsize(out_path)
 
         def iter_file():
@@ -817,7 +818,13 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
     platform = _platform(page_url or "")
     # For platforms that need best quality auto-selection, ignore format_id
     auto_select = platform in ("tiktok", "instagram", "youtube") or not format_id or format_id == "best"
-    fmt_sel = BEST_SEL if auto_select else format_id
+    if auto_select:
+        fmt_sel = BEST_SEL
+    elif format_id.endswith("v"):
+        # Video-only format_id (e.g. Facebook DASH): append best audio so yt-dlp merges them
+        fmt_sel = f"{format_id}+bestaudio[ext=m4a]/bestvideo[id={format_id}]+bestaudio/bestvideo+bestaudio/best"
+    else:
+        fmt_sel = format_id
 
     opts: dict = {
         "quiet": True,
@@ -861,7 +868,8 @@ async def ytdlp_download(page_url: str, format_id: str = "best", filename: str =
         if file_size == 0:
             raise RuntimeError("El archivo descargado está vacío.")
 
-        safe = re.sub(r"[^\w\-.]", "_", filename)[:80] + ".mp4"
+        safe = re.sub(r"[^a-zA-Z0-9]", "_", filename)
+        safe = re.sub(r"_+", "_", safe).strip("_")[:80] + ".mp4"
 
         def iter_file():
             with open(actual, "rb") as f:
