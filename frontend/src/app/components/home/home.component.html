@@ -90,7 +90,7 @@
 
       <div class="result-body">
         @if (res.thumbnail) {
-          <img [src]="res.thumbnail" [alt]="res.title" class="thumb" loading="lazy" />
+          <img [src]="imgSrc(res.thumbnail, res.title)" [alt]="res.title" class="thumb" loading="lazy" />
         }
         <div class="result-info">
           <h2 class="result-title">{{ res.title }}</h2>
@@ -145,7 +145,7 @@
             @for (item of res.carousel; track item.index) {
               <div class="carousel-item neo-sm" (click)="downloadCarouselItem(item, res.title)">
                 @if (item.thumb) {
-                  <img [src]="item.thumb" [alt]="'Item ' + item.index" loading="lazy" />
+                  <img [src]="imgSrc(item.thumb, 'item_' + item.index)" [alt]="'Item ' + item.index" loading="lazy" />
                 }
                 <span class="item-type">{{ item.kind === 'video' ? '▶' : '🖼' }}</span>
                 <span class="item-num">#{{ item.index }}</span>

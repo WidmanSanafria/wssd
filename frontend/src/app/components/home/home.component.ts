@@ -99,6 +99,16 @@ export class HomeComponent implements OnInit {
     return fmt.quality.toLowerCase().includes('hd') || fmt.needs_merge;
   }
 
+  /** Route Instagram/Facebook CDN image URLs through our proxy to avoid hot-link blocks. */
+  imgSrc(url: string | undefined, label = 'thumb'): string {
+    if (!url) return '';
+    if (url.includes('cdninstagram.com') || url.includes('instagram.com') ||
+        url.includes('fbcdn.net') || url.includes('facebook.com')) {
+      return this.dl.getProxyUrl(url, label, true);
+    }
+    return url;
+  }
+
   private showOverlay(isTT: boolean): void {
     const stages = isTT
       ? ['🔍 Extrayendo URL…', '📥 Descargando video…', '🔊 Descargando audio…', '⚙️ Combinando…', '✅ Preparando archivo…']

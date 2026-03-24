@@ -25,8 +25,9 @@ export class DownloadService {
     );
   }
 
-  getProxyUrl(url: string, filename: string): string {
-    return `/api/download/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+  getProxyUrl(url: string, filename: string, inline = false): string {
+    const base = `/api/download/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+    return inline ? base + '&inline=true' : base;
   }
 
   getMergeUrl(videoUrl: string, audioUrl: string, filename: string): string {

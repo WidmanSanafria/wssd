@@ -57,6 +57,16 @@ services:
       API_URL: http://spring:8080
     restart: unless-stopped
 
+  bgutil-pot:
+    image: brainicism/bgutil-ytdlp-pot-provider
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4416/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
   extractor:
     build:
       context: ./extractor
@@ -65,6 +75,10 @@ services:
       - cookies_data:/cookies
     environment:
       SYNC_API_KEY: ${SYNC_API_KEY:-wssd-sync-changeme}
+      BGUTIL_URL:   http://bgutil-pot:4416
+    depends_on:
+      bgutil-pot:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
